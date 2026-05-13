@@ -1,0 +1,53 @@
+# ============================================================
+# Configurations for Bootstrap experiment workflow 
+# ============================================================
+ 
+TreeReference_sequence: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/nextclade/ref_dataset/CY121680/simulated_source_data/sequences_CY121680.fasta"
+TreeReference_metadata: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/nextclade/ref_dataset/CY121680/simulated_source_data/metadata_CY121680.tsv"
+
+output_dir: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/augur/Bootstrap_experiment/workflow/results_H1_Geneva_05Jan25"
+
+exclude_wastewater: true
+
+
+# ============================================================
+# LolliJac configuration settings for H1 24/25 season 
+# ============================================================
+ 
+
+reference: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/Lollijac/resources/H1.fasta"
+reference_name: "CY121680.1"
+reference_index: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/Lollijac/resources/H1.fasta.fai"
+path_to_data: "/cluster/project/pangolin/old_setup/not_necessary/influenza_pipeline/IA_H1/working/results"
+results_dir: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/Lollijac/results_H1_Geneva_05Jan25" #Lollijac output
+# results_dir: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/augur/Bootstrap_experiment/workflow/lollijac_results_H1_24_25" #test
+phred_score_threshold: 20
+minimal_read_length: 200 # shorter fragments are filtered out
+minimal_read_mapping_quality: 9
+time_start: "2024-11-01"
+time_end: "2025-04-30"
+threshold_value: 0.005
+rare_mutation_limit_days: 2
+coverage_threshold: 10 
+
+# Amplicon-specific BED files
+amplicons:
+#   amplicon1:
+#     bedfile: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/Lollijac/resources/H1.amp1.insert.bed"
+  # amplicon2:
+    # bedfile: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/Lollijac/resources/H1.amp2.insert.bed"
+  amplicon3:
+    bedfile: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/Lollijac/resources/H1.amp3.insert.bed"
+  # amplicon4:
+    # bedfile: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/Lollijac/resources/H1.amp4.insert.bed"
+  # amplicon5:
+    # bedfile: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/Lollijac/resources/H1.amp5.insert.bed"
+  # amplicon6:
+    # bedfile: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/Lollijac/resources/H1.amp6.insert.bed"
+
+#only want to inestigate one location so far
+locations:
+  geneve:
+    location_name: "Genève (GE)"
+    location_code: '16'
+  

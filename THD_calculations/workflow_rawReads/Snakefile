@@ -1,0 +1,333 @@
+# from logging import config
+import pandas as pd
+import glob
+import yaml
+import re
+
+
+# ============================================================
+# Downstream analysis rules 
+# ============================================================
+
+AMPLICONS = list(config["amplicons"].keys())
+LOCATIONS = list(config["locations"].keys())
+
+input_dir = config['input_dir']
+output_dir = config['output_dir']
+
+
+wildcard_constraints:
+    sample="[^/]+/[^/]+",      # Matches 'sample/batch'
+    location="[^/]+",          # Prevents location from grabbing extra slashes
+    amplicon="[^/]+"           # Prevents amplicon from grabbing extra slashes
+
+rule all:
+    input:
+        expand(f"{output_dir}/{{location}}/{{amplicon}}/nextclade_results", location=LOCATIONS, amplicon=AMPLICONS),
+        # abundance_analysis outputs
+        expand(f"{output_dir}/{{location}}/{{amplicon}}/subclade_abundance/nextclade_metadata_processed.tsv", location=LOCATIONS, amplicon=AMPLICONS),
+        # coverage_analysis outputs
+        expand(f"{output_dir}/{{location}}/{{amplicon}}/amplicon_coverage/coverage_processed.tsv", location=LOCATIONS, amplicon=AMPLICONS),
+        # abundance_analysis_combined_location outputs
+        expand(f"{output_dir}/over_all_locations/{{amplicon}}/subclade_abundance/combined_nextclade_metadata_processed.tsv", amplicon=AMPLICONS),
+        # coverage_analysis_combined_location outputs
+        expand(f"{output_dir}/over_all_locations/{{amplicon}}/amplicon_coverage/combined_coverage_processed.tsv", amplicon=AMPLICONS)
+
+# rule all_coverage_info:
+#     input:
+#         expand(f"{output_dir}/{{location}}/{{amplicon}}/combined_amp_cov_location_amplicon.tsv", location=LOCATIONS, amplicon=AMPLICONS),
+#         expand(f"{output_dir}/{{location}}/{{amplicon}}/amplicon_coverage/coverage_processed.tsv", location=LOCATIONS, amplicon=AMPLICONS),
+#         expand(f"{output_dir}/over_all_locations/{{amplicon}}/amplicon_coverage/combined_coverage_processed.tsv", amplicon=AMPLICONS)
+
+
+rule more_downsampling_fasta:
+    """
+    input: fasta file of amplicon reads
+    output: downsampled fasta file of amplicon reads
+    """
+    input:
+        ww_fasta=f"{input_dir}/{{location}}/{{amplicon}}/combined_downsampled_amp_reads.fasta"
+    output:
+        ww_downsampled_fasta=f"{output_dir}/{{location}}/{{amplicon}}/combined_more_downsampled_amp_reads.fasta"
+    log:
+        f"logs/{{location}}/{{amplicon}}/downsample_fasta.log"
+    params:
+        amplicon_name="{amplicon}",
+        proportion=config["percentage_subsample"]
+    shell:
+        """
+        conda run -n nextclade bash -c 'cat {input.ww_fasta} | seqkit sample -p {params.proportion} -o {output.ww_downsampled_fasta}' &> {log}
+        """
+
+
+rule make_meta_ww:
+    """extract metadata from simulated amplicon read headers for wastewater samples"""  
+    input:
+        ww_downsampled_fasta=f"{output_dir}/{{location}}/{{amplicon}}/combined_more_downsampled_amp_reads.fasta"
+    output:
+        metadata=f"{output_dir}/{{location}}/{{amplicon}}/metadata.tsv"
+    log:
+        f"logs/{{location}}/{{amplicon}}/make_meta_ww.log"
+    shell:
+        """
+        conda run -n nextclade python scripts/fasta_to_metadata.py \
+            {input.ww_downsampled_fasta} \
+            -o {output.metadata}
+        """
+
+rule nextclade_classify_ww:
+    """Classify wastewater samples using Nextclade"""
+    input:
+        ww_downsampled_fasta=f"{output_dir}/{{location}}/{{amplicon}}/combined_more_downsampled_amp_reads.fasta"
+    output:
+        nextclade_output=directory(f"{output_dir}/{{location}}/{{amplicon}}/nextclade_results")
+    params:
+        reference=config['reference'],
+        reference_dataset=config['reference_dataset']
+    log:
+        f"logs/{{location}}/{{amplicon}}/nextclade_classify_ww.log"
+    shell:
+        """
+        conda run -n nextclade nextclade3 run \
+            --input-dataset {params.reference_dataset} \
+            --input-ref {params.reference} \
+            --masked-muts-weight 0 \
+            --output-all {output.nextclade_output} \
+            {input.ww_downsampled_fasta}
+        """
+rule merge_nextclade_meta_ww:
+    """Merge Nextclade results with metadata for wastewater samples"""
+    input:
+        metadata=f"{output_dir}/{{location}}/{{amplicon}}/metadata.tsv"
+    output:
+        merged=f"{output_dir}/{{location}}/{{amplicon}}/nextclade_metadata.tsv"
+    params:
+        nextclade=f"{output_dir}/{{location}}/{{amplicon}}/nextclade_results/nextclade.tsv"
+    log:
+        f"logs/{{location}}/{{amplicon}}/merge_nextclade_meta_ww.log"
+    shell:
+        """
+        conda run -n nextclade python scripts/add_metaInfo.py \
+            -m {input.metadata} \
+            -n {params.nextclade} \
+            -l {wildcards.location} \
+            -a {wildcards.amplicon} \
+            -o {output.merged}
+        """
+
+rule coverage_info_ww:
+    """Extract coverage information for wastewater samples"""
+    input:
+        regional_coverage=f"{input_dir}/{{location}}/{{amplicon}}/combined_amp_coverage.txt"
+    output:
+        coverage_info=f"{output_dir}/{{location}}/{{amplicon}}/combined_amp_cov_location_amplicon.tsv"
+    log:
+        f"logs/{{location}}/{{amplicon}}/coverage_info_ww.log"
+    shell:
+        """
+        conda run -n nextclade python scripts/coverage_info_ww.py \
+            -i {input.regional_coverage} \
+            -o {output.coverage_info} \
+            -l {wildcards.location} \
+            -a {wildcards.amplicon} \
+            &> {log}
+        """
+
+#TODO: make THD calc more memory efficient
+
+rule calculate_thd:
+    """Calculate THD for wastewater samples"""
+    input:
+        seq_file=f"{output_dir}/{{location}}/{{amplicon}}/combined_more_downsampled_amp_reads.fasta",
+        meta_file=f"{output_dir}/{{location}}/{{amplicon}}/metadata.tsv"
+    output:
+        output_file=f"{output_dir}/{{location}}/{{amplicon}}/THD_calculation/index_time_parameters.tsv",
+        output_IDs=f"{output_dir}/{{location}}/{{amplicon}}/THD_calculation/usedSeq_IDs.tsv",
+        output_plot=f"{output_dir}/{{location}}/{{amplicon}}/THD_calculation/plot_index_time_parameters.png"
+    params:
+        mutation_rate=config["mutation_rate"],
+        timescales=config.get("timescales", "0.15,0.2,0.25,0.3,0.35,0.4"),
+        timewindows=config.get("timewindows", "0.019,0.038,0.0833,0.15,0.23"),
+        nextclade_file=f"{output_dir}/{{location}}/{{amplicon}}/nextclade_results/nextclade.tsv",
+        colour_palette=config["colour_palette"]
+    log:
+        f"logs/{{location}}/{{amplicon}}/calculate_thd.log"
+    resources:
+        mem_mb=100000
+    shell:
+        """
+        conda run -n THD_analysis Rscript scripts/THD_analysis.R \
+            -q {input.seq_file} \
+            -m {input.meta_file} \
+            -n {params.nextclade_file} \
+            -r {params.mutation_rate} \
+            -s {params.timescales} \
+            -w {params.timewindows} \
+            -f {output.output_file} \
+            -i {output.output_IDs} \
+            -p {output.output_plot} \
+            -c {params.colour_palette} \
+            &> {log}
+        """
+
+
+rule abundance_analysis:
+    """Analyze subclade abundance from wastewater samples"""
+    input:
+        nextclade_meta_file=f"{output_dir}/{{location}}/{{amplicon}}/nextclade_metadata.tsv",
+        seq_ids=f"{output_dir}/{{location}}/{{amplicon}}/THD_calculation/usedSeq_IDs.tsv"
+    output:
+        output_file=f"{output_dir}/{{location}}/{{amplicon}}/subclade_abundance/nextclade_metadata_processed.tsv",
+        output_plot_byDay=f"{output_dir}/{{location}}/{{amplicon}}/subclade_abundance/plot_subclade_frequency_byDay.png",
+        output_plot_byWeek=f"{output_dir}/{{location}}/{{amplicon}}/subclade_abundance/plot_subclade_frequency_byWeek.png"
+    params:
+        colour_palette=config["colour_palette"]
+    log:
+        f"logs/{{location}}/{{amplicon}}/abundance_analysis.log"
+    shell:
+        """
+        conda run -n THD_analysis Rscript scripts/abundance_analysis.R \
+            -m {input.nextclade_meta_file} \
+            -i {input.seq_ids} \
+            -f {output.output_file} \
+            -d {output.output_plot_byDay} \
+            -w {output.output_plot_byWeek} \
+            -c {params.colour_palette} \
+            &> {log}
+        """
+
+
+rule coverage_analysis:
+    """Analyze coverage from wastewater samples"""
+    input:
+        coverage_file=f"{output_dir}/{{location}}/{{amplicon}}/combined_amp_cov_location_amplicon.tsv"
+    output:
+        output_file=f"{output_dir}/{{location}}/{{amplicon}}/amplicon_coverage/coverage_processed.tsv",
+        output_plot_covbases=f"{output_dir}/{{location}}/{{amplicon}}/amplicon_coverage/plot_covbases.png",
+        output_plot_nreads=f"{output_dir}/{{location}}/{{amplicon}}/amplicon_coverage/plot_numreads.png"
+    log:
+        f"logs/{{location}}/{{amplicon}}/coverage_analysis.log"
+    shell:
+        """
+        conda run -n THD_analysis Rscript scripts/coverage_analysis.R \
+            -c {input.coverage_file} \
+            -f {output.output_file} \
+            -b {output.output_plot_covbases} \
+            -n {output.output_plot_nreads} \
+            &> {log}
+        """
+
+
+rule combine_across_locations:
+    """Combine files across all locations for a given amplicon"""
+    input:
+        fasta_files=expand(f"{output_dir}/{{location}}/{{{{amplicon}}}}/combined_more_downsampled_amp_reads.fasta", location=LOCATIONS),
+        metadata_files=expand(f"{output_dir}/{{location}}/{{{{amplicon}}}}/metadata.tsv", location=LOCATIONS),
+        nextclade_meta_files=expand(f"{output_dir}/{{location}}/{{{{amplicon}}}}/nextclade_metadata.tsv", location=LOCATIONS),
+        coverage_files=expand(f"{output_dir}/{{location}}/{{{{amplicon}}}}/combined_amp_cov_location_amplicon.tsv", location=LOCATIONS)
+    output:
+        combined_fasta=f"{output_dir}/over_all_locations/{{amplicon}}/combined_more_downsampled_amp_reads.fasta",
+        combined_metadata=f"{output_dir}/over_all_locations/{{amplicon}}/combined_metadata.tsv",
+        combined_nextclade_meta=f"{output_dir}/over_all_locations/{{amplicon}}/combined_nextclade_metadata.tsv",
+        combined_coverage=f"{output_dir}/over_all_locations/{{amplicon}}/combined_amp_cov_location_amplicon.tsv"
+    log:
+        f"logs/over_all_locations/{{amplicon}}/combine_across_locations.log"
+    shell:
+        """
+        conda run -n nextclade python scripts/combine_across_locations.py \
+            --fasta-files {input.fasta_files} \
+            --metadata-files {input.metadata_files} \
+            --nextclade-meta-files {input.nextclade_meta_files} \
+            --coverage-files {input.coverage_files} \
+            --out-fasta {output.combined_fasta} \
+            --out-metadata {output.combined_metadata} \
+            --out-nextclade-meta {output.combined_nextclade_meta} \
+            --out-coverage {output.combined_coverage} \
+            &> {log}
+        """
+
+
+rule calculate_thd_combined_location:
+    """Calculate THD for combined wastewater samples across all locations"""
+    input:
+        seq_file=f"{output_dir}/over_all_locations/{{amplicon}}/combined_more_downsampled_amp_reads.fasta",
+        meta_file=f"{output_dir}/over_all_locations/{{amplicon}}/combined_metadata.tsv",
+        nextclade_file=f"{output_dir}/over_all_locations/{{amplicon}}/combined_nextclade_metadata.tsv"
+    output:
+        output_file=f"{output_dir}/over_all_locations/{{amplicon}}/combined_index_time_parameters.tsv",
+        output_IDs=f"{output_dir}/over_all_locations/{{amplicon}}/combined_usedSeq_IDs.tsv",
+        output_plot=f"{output_dir}/over_all_locations/{{amplicon}}/combined_plot_index_time_parameters.png"
+    params:
+        mutation_rate=config["mutation_rate"],
+        timescales=config.get("timescales", "0.15,0.2,0.25,0.3,0.35,0.4"),
+        timewindows=config.get("timewindows", "0.019,0.038,0.0833,0.15,0.23"),
+        colour_palette=config["colour_palette"]
+    log:
+        f"logs/over_all_locations/{{amplicon}}/calculate_thd.log"
+    resources:
+        #TODO: optimise memory usage of THD calculation
+        mem_mb=250000
+    shell:
+        """
+        conda run -n THD_analysis Rscript scripts/THD_analysis.R \
+            -q {input.seq_file} \
+            -m {input.meta_file} \
+            -n {input.nextclade_file} \
+            -r {params.mutation_rate} \
+            -s {params.timescales} \
+            -w {params.timewindows} \
+            -f {output.output_file} \
+            -i {output.output_IDs} \
+            -p {output.output_plot} \
+            -c {params.colour_palette} \
+            &> {log}
+        """
+
+
+rule abundance_analysis_combined_location:
+    """Analyze subclade abundance from combined wastewater samples across all locations"""
+    input:
+        nextclade_meta_file=f"{output_dir}/over_all_locations/{{amplicon}}/combined_nextclade_metadata.tsv",
+        seq_ids=f"{output_dir}/over_all_locations/{{amplicon}}/combined_usedSeq_IDs.tsv"
+    output:
+        output_file=f"{output_dir}/over_all_locations/{{amplicon}}/subclade_abundance/combined_nextclade_metadata_processed.tsv",
+        output_plot_byDay=f"{output_dir}/over_all_locations/{{amplicon}}/subclade_abundance/combined_plot_subclade_frequency_byDay.png",
+        output_plot_byWeek=f"{output_dir}/over_all_locations/{{amplicon}}/subclade_abundance/combined_plot_subclade_frequency_byWeek.png"
+    log:
+        f"logs/over_all_locations/{{amplicon}}/abundance_analysis.log"
+    params:
+        colour_palette=config["colour_palette"]
+    shell:
+        """
+        conda run -n THD_analysis Rscript scripts/abundance_analysis.R \
+            -m {input.nextclade_meta_file} \
+            -i {input.seq_ids} \
+            -f {output.output_file} \
+            -d {output.output_plot_byDay} \
+            -w {output.output_plot_byWeek} \
+            -a \
+            -c {params.colour_palette} \
+            &> {log}
+        """
+
+
+rule coverage_analysis_combined_location:
+    """Analyze coverage from combined wastewater samples across all locations"""
+    input:
+        coverage_file=f"{output_dir}/over_all_locations/{{amplicon}}/combined_amp_cov_location_amplicon.tsv"
+    output:
+        output_file=f"{output_dir}/over_all_locations/{{amplicon}}/amplicon_coverage/combined_coverage_processed.tsv",
+        output_plot_covbases=f"{output_dir}/over_all_locations/{{amplicon}}/amplicon_coverage/combined_plot_covbases.png",
+        output_plot_nreads=f"{output_dir}/over_all_locations/{{amplicon}}/amplicon_coverage/combined_plot_numreads.png"
+    log:
+        f"logs/over_all_locations/{{amplicon}}/coverage_analysis.log"
+    shell:
+        """
+        conda run -n THD_analysis Rscript scripts/coverage_analysis.R \
+            -c {input.coverage_file} \
+            -f {output.output_file} \
+            -b {output.output_plot_covbases} \
+            -n {output.output_plot_nreads} \
+            -a \
+            &> {log}
+        """

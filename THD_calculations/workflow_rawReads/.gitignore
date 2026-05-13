@@ -1,0 +1,30 @@
+# --- General Files to Ignore ---
+
+# macOS system files
+**/.DS_Store
+**/*._*
+
+# R Project files
+**/.Rproj.user
+**/.RData
+**/.Rhistory
+
+# Execution and Log files
+**/*.err
+**/*.out
+
+# Specific Notebooks
+test_merge.ipynb
+
+
+# --- Directories to Ignore ---
+
+# Snakemake internal files
+.snakemake/
+
+# Pattern-matched result folders
+results*/
+
+# Log directories
+test_logs/
+logs/

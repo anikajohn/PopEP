@@ -1,0 +1,20 @@
+name: THD_analysis
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+  - anaconda
+dependencies:
+  - r-tidyverse
+  - r-tidyr
+  - r-ggplot2
+  - r-stringr
+  - r-pals
+  - r-data.table
+  - r-optparse
+  - bioconductor-biostrings
+  - bioconductor-msa
+  - bioconductor-pwalign
+  - ca-certificates
+  - openssl
+prefix: /cluster/work/bewi/members/anjohn/miniconda3/envs/THD_analysis

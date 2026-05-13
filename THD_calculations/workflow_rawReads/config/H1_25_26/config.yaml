@@ -1,0 +1,62 @@
+# ============================================================
+# Configurations for Index calculation
+# ============================================================
+
+#mutation_rate = clock rate https://github.com/nextstrain/seasonal-flu/blob/master/workflow/snakemake_rules/core.smk
+mutation_rate: 0.00329
+timescales: "0.15,0.2,0.25,0.3,0.35,0.4"
+timewindows: "0.019,0.038,0.0833,0.15,0.23"
+colour_palette: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/THD_calculations/workflow_rawReads/resources/colour_palette/H1/colours.json"
+
+# ============================================================
+# Configurations for Nextclade classification 
+# ============================================================
+ 
+input_dir: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/raw_read_extraction/workflow/results_H1_25_26"
+output_dir: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/THD_calculations/workflow_rawReads/results_H1_25_26_updated_ref_dataset"
+reference_dataset: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/THD_calculations/workflow_rawReads/resources/datasets/H1_26update/CY121680"
+percentage_subsample: 0.01
+
+# ============================================================
+# LolliJac configuration settings for H1 25/26 season 
+# ============================================================
+ 
+reference: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/Lollijac/resources/H1.fasta"
+reference_name: "CY121680.1"
+reference_index: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/Lollijac/resources/H1.fasta.fai"
+
+amplicons:
+#   amplicon1:
+#     bedfile: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/Lollijac/resources/H1.amp1.insert.bed"
+  amplicon2:
+    bedfile: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/Lollijac/resources/H1.amp2.insert.bed"
+  amplicon3:
+    bedfile: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/Lollijac/resources/H1.amp3.insert.bed"
+  amplicon4:
+    bedfile: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/Lollijac/resources/H1.amp4.insert.bed"
+  amplicon5:
+    bedfile: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/Lollijac/resources/H1.amp5.insert.bed"
+  amplicon6:
+    bedfile: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/Lollijac/resources/H1.amp6.insert.bed"
+
+#Luzern and Altenrhein are not included in the analysis as they had very low coverage and no mutations detected.
+
+locations:
+  zurich:
+    location_name: "Zürich (ZH)"
+    location_code: '10'
+  lugano:
+    location_name: "Lugano (TI)"
+    location_code: '05'
+  basel:
+    location_name: "Basel (BS)"
+    location_code: '15'
+  geneve:
+    location_name: "Genève (GE)"
+    location_code: '16'
+  chur:
+    location_name: "Chur (GR)"
+    location_code: '17'
+  laupen:
+    location_name: "Laupen (BE)"
+    location_code: '25'
