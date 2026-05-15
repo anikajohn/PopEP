@@ -36,7 +36,9 @@ index.bandwidth = function(timescale, genome_length, mutation_rate) {
 #' @param genome_length Genome length (in bp)
 #' @return Named vector of index values for each sample
 #' @export
-compute.index.from.distance = function(distance_mat, time_window, metadata, mutation_rate, timescale, genome_length){
+#' 
+compute.index.from.distance = function(distance_mat, time_window, metadata, mutation_rate, timescale, genome_length,
+                                        chunk_size = 500L, mc.cores = 1L){
   ## Input validation
   if (!is.matrix(distance_mat)) {
     stop("'distance_mat' must be a matrix.")
@@ -61,52 +63,57 @@ compute.index.from.distance = function(distance_mat, time_window, metadata, muta
   if (!is.numeric(genome_length) || length(genome_length) != 1 || genome_length <= 0) {
     stop("'genome_length' must be a single positive integer.")
   }
-  
+
   ## Match metadata to matrix
   sample_ids <- colnames(distance_mat)
   times <- metadata$time[match(sample_ids, metadata$ID)]
   if (any(is.na(times))) {
     stop("Some sample IDs in 'distance_mat' are not found in 'metadata$ID'.")
   }
-  
-  #   # Convert dates to numeric years if needed
-  #   if (inherits(times, "Date")) {
-  #     times <- as.numeric(times) / 365.25  # Convert days since epoch to years
-  #   }
-  
-  n <- length(sample_ids)
-  
-  ## Time-window filtering and temporal correction
-  hamming_mat <- distance_mat
-  window_mat <- matrix(TRUE, nrow = n, ncol = n)
-  
-  for (j in seq_len(n)) {
-    t_j <- times[j]
-    for (i in seq_len(n)) {
-      if (i == j) next
-      t_i <- times[i]
-      ## Filter: only keep pairs within the time window
-      if (abs(t_i - t_j) > time_window) {
-        hamming_mat[i, j] <- NA
-        window_mat[i, j] <- FALSE
-      } else {
-        ## Temporal correction: adjust distance by time difference
-        hamming_mat[i, j] <- hamming_mat[i, j] + abs(t_i - t_j)
-      }
-    }
+
+  n           <- length(sample_ids)
+  scale_fac   <- mutation_rate * genome_length / 2
+  bandwidth   <- index.bandwidth(timescale, genome_length, mutation_rate)
+
+  Bsums         <- numeric(n)
+  window_counts <- integer(n)
+
+  ## Process columns in chunks to cap peak memory at n * chunk_size entries.
+  ## Each chunk builds only an (n x chunk_size) sub-matrix instead of the full
+  ## (n x n) matrix, replacing the O(n^2) element-wise R loop with vectorised
+  ## C-level arithmetic.
+  chunk_breaks <- split(seq_len(n), ceiling(seq_len(n) / chunk_size))
+
+  chunk_results <- parallel::mclapply(chunk_breaks, function(cidx) {
+    ## Pairwise absolute time differences: (n x |cidx|)
+    td <- abs(outer(times, times[cidx], "-"))
+
+    ## Within-window mask; diagonal (self-comparisons) is excluded
+    is_diag <- outer(seq_len(n), cidx, `==`)
+    in_win <- (td <= time_window) & !is_diag
+
+    ## Distance sub-matrix with temporal correction applied only within window,
+    ## then scaled; out-of-window entries are set to NA so colSums ignores them
+    d_scaled <- (distance_mat[, cidx, drop = FALSE] + td) * scale_fac
+    d_scaled[!in_win] <- NA_real_
+
+    B <- bandwidth ^ d_scaled
+
+    list(
+      cidx          = cidx,
+      Bsums_chunk   = colSums(B, na.rm = TRUE),
+      window_chunk  = colSums(in_win)
+    )
+  }, mc.cores = mc.cores)
+
+  for (res in chunk_results) {
+    Bsums[res$cidx]         <- res$Bsums_chunk
+    window_counts[res$cidx] <- res$window_chunk
   }
-  
-  ## Scale distances
-  hamming_mat <- hamming_mat * mutation_rate * genome_length / 2
-  
-  ## Index computation
-  bandwidth <- index.bandwidth(timescale, genome_length, mutation_rate)
-  B <- bandwidth^hamming_mat
-  
-  Bsums <- colSums(B, na.rm = TRUE) - 1 #-1 to exclude self-comparisons
-  index <- Bsums / (colSums(window_mat) - 1) #averaging over all allowed times 
+
+  index <- Bsums / window_counts
   names(index) <- sample_ids
-  
+
   return(index)
 }
 
@@ -126,13 +133,15 @@ compute.index.from.distance = function(distance_mat, time_window, metadata, muta
 #' @examples
 compute_and_merge_results <- function(distance_mat, time_window, metadata, 
                                       mutation_rate, timescale, genome_length,
-                                      nextclade) {
+                                      nextclade, mc.cores = 1L) {
+  
   indicies <- compute.index.from.distance(distance_mat, 
                                           time_window, 
                                           metadata, 
                                           mutation_rate, 
                                           timescale, 
-                                          genome_length)
+                                          genome_length,
+                                          mc.cores = mc.cores)
   indicies = indicies[is.finite(indicies)]
   
   indicies_df = as.data.frame(indicies)
