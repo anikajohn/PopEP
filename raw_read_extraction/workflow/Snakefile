@@ -59,13 +59,30 @@ def get_samples_for_location(wildcards):
         return yaml.safe_load(f)["sample_batch"]
     
 
-def get_location_fastas(wildcards):
-    """Get all sample FASTA files for a location/amplicon combination"""
+# def get_location_fastas(wildcards):
+#     """Get all sample FASTA files for a location/amplicon combination"""
+#     samples = get_samples_for_location(wildcards)
+#     return expand(
+#         f"{output_dir}/{wildcards.location}/{wildcards.amplicon}/{{sample}}/downsampled_amp_reads.fasta",
+#         sample=samples
+#     )
+
+def get_location_read_version(wildcards):
+    """Get all sample read version files for a location/amplicon combination"""
     samples = get_samples_for_location(wildcards)
     return expand(
-        f"{output_dir}/{wildcards.location}/{wildcards.amplicon}/{{sample}}/downsampled_amp_reads.fasta",
+        f"{output_dir}/{wildcards.location}/{wildcards.amplicon}/{{sample}}/simulated_amp_reads.fasta",
         sample=samples
     )
+
+def get_location_read_version_counts(wildcards):
+    """Get all sample read version count files for a location/amplicon combination"""
+    samples = get_samples_for_location(wildcards)
+    return expand(
+        f"{output_dir}/{wildcards.location}/{wildcards.amplicon}/{{sample}}/read_counts.tsv",
+        sample=samples
+    )
+
 
 def get_location_covs(wildcards):
     """Get all sample coverage files for a location/amplicon combination"""
@@ -74,6 +91,16 @@ def get_location_covs(wildcards):
         f"{output_dir}/{wildcards.location}/{wildcards.amplicon}/{{sample}}/amp_coverage.txt",
         sample=samples
     )
+
+def get_all_basecnt_for_location(wildcards):
+    """Get all basecnt files across all amplicons and samples for a location"""
+    samples = get_samples_for_location(wildcards)
+    return expand(
+        f"{output_dir}/{wildcards.location}/{{amplicon}}/{{sample}}/alignments/basecnt.tsv.gz",
+        amplicon=AMPLICONS,
+        sample=samples
+    )
+
 
 def get_all_fused_bams(wildcards):
     """Get all fused BAM files across all locations (for targeting get_fused_bam)"""
@@ -100,7 +127,8 @@ wildcard_constraints:
 
 rule all:
     input:
-        expand(f"{output_dir}/{{location}}/{{amplicon}}/combined_downsampled_amp_reads.fasta", location=LOCATIONS, amplicon=AMPLICONS),
+        expand(f"{output_dir}/{{location}}/{{amplicon}}/combined_amp_reads_versions.fasta", location=LOCATIONS, amplicon=AMPLICONS),
+        expand(f"{output_dir}/{{location}}/{{amplicon}}/combined_amp_read_versions_counts.tsv", location=LOCATIONS, amplicon=AMPLICONS),
         expand(f"{output_dir}/{{location}}/{{amplicon}}/combined_amp_coverage.txt", location=LOCATIONS, amplicon=AMPLICONS)
 
 rule all_fused_bams:
@@ -211,14 +239,15 @@ rule get_fused_bam:
     
 rule extract_amplicon_reads:
     """
-    input: downsampled fasta file of amplicon reads
-    output: reads mapped to amplicon regions in fasta format
+    input: fused reads in bam format; coordinates of amplicon regions
+    output: reads mapped to amplicon regions in bam format
     """
     input:
-        fasta=f"{output_dir}/{{location}}/samples/{{sample}}/{{sample}}_fused_sorted.bam"
+        bam=f"{output_dir}/{{location}}/samples/{{sample}}/{{sample}}_fused_sorted.bam"
     output:
         amplicon_bam_unsorted=temp(f"{output_dir}/{{location}}/{{amplicon}}/{{sample}}/amp_fused.bam"),
-        amplicon_bam=f"{output_dir}/{{location}}/{{amplicon}}/{{sample}}/amp_fused_sorted.bam"
+        amplicon_bam=f"{output_dir}/{{location}}/{{amplicon}}/{{sample}}/amp_fused_sorted.bam",
+        amplicon_bam_bai=f"{output_dir}/{{location}}/{{amplicon}}/{{sample}}/amp_fused_sorted.bam.bai"
     params:
         buffer=config['buffer'],
         start=lambda wildcards: get_amplicon_coords(wildcards)["start"],
@@ -227,11 +256,13 @@ rule extract_amplicon_reads:
         f"logs/{{location}}/{{amplicon}}/{{sample}}/combine_amplicon_reads.log"
     shell:
         """
-        python scripts/filtering_bam.py -i {input.fasta} -o {output.amplicon_bam_unsorted} -s {params.start} -e {params.end} -b {params.buffer} 
+        python scripts/filtering_bam.py -i {input.bam} -o {output.amplicon_bam_unsorted} -s {params.start} -e {params.end} -b {params.buffer} 
         samtools sort {output.amplicon_bam_unsorted} -o {output.amplicon_bam}
         samtools index {output.amplicon_bam}
         &> {log}
         """
+
+
 
 rule amplicon_coverage:
     """
@@ -254,64 +285,234 @@ rule amplicon_coverage:
         2> {log}
         """
 
-rule bam_to_fasta:
-    """
-    input: fused bam file of amplicon reads
-    output: fasta file of amplicon reads
-    """
+rule basecounts:
     input:
-        bam=f"{output_dir}/{{location}}/{{amplicon}}/{{sample}}/amp_fused_sorted.bam"
+        amplicon_bam=f"{output_dir}/{{location}}/{{amplicon}}/{{sample}}/amp_fused_sorted.bam"
     output:
-        fasta=f"{output_dir}/{{location}}/{{amplicon}}/{{sample}}/amp_fused_sorted.fasta"
-    log:
-        f"logs/{{location}}/{{amplicon}}/{{sample}}/amp_bam_to_fasta.log"
+        BASECNT=f"{output_dir}/{{location}}/{{amplicon}}/{{sample}}/alignments/basecnt.tsv.gz",
+        COVERAGE=f"{output_dir}/{{location}}/{{amplicon}}/{{sample}}/alignments/coverage.tsv.gz",
+        STATS=f"{output_dir}/{{location}}/{{amplicon}}/{{sample}}/alignments/REF_aln_stats.yaml"
     params:
-        sample_name="{sample}",
-        amplicon_name="{amplicon}"
+        NAME="{location}_{amplicon}_{sample}"
+    log:
+        outfile=f"{output_dir}/{{location}}/{{amplicon}}/{{sample}}/alignments/basecounts.out.log",
+        errfile=f"{output_dir}/{{location}}/{{amplicon}}/{{sample}}/alignments/basecounts.err.log"
+    resources:
+        disk_mb=1250
+    threads: 1
     shell:
         """
-        python scripts/BamToFasta.py \
-            -i {input.bam} \
-            -o {output.fasta} \
-            -s {params.sample_name} \
-            -a {params.amplicon_name} \
+        aln2basecnt --first "1" --basecnt "{output.BASECNT}" --coverage "{output.COVERAGE}" --name "{params.NAME}" --stats "{output.STATS}" "{input.amplicon_bam}" > {log.outfile} 2> >(tee {log.errfile} >&2)
+        """
+
+
+rule generate_mutations_tsv:
+    """Generate mutations.tsv from basecnt files for a location"""
+    input:
+        fasta=REFERENCE,
+        basecnt=get_all_basecnt_for_location,
+        timeline=f"{output_dir}/timeline.tsv"
+    output:
+        mutations_tsv=f"{output_dir}/{{location}}/samples/mutations.tsv"
+    params:
+        basecnt_pattern=lambda wildcards: f"{output_dir}/{wildcards.location}/*/*/alignments/basecnt.tsv.gz",
+        location_name=get_location_name,
+        location_code=get_location_code,
+        reference_name=REFERENCE_NAME,
+        time_start=config["time_start"],
+        time_end=config["time_end"],
+        threshold=config["threshold_value"],
+        rare_days=config["rare_mutation_limit_days"],
+        cov_threshold=config["coverage_threshold"]
+    log:
+        f"logs/{{location}}/samples/generate_mutations_tsv.log"
+    shell:
+        """
+        python scripts/basecnt_to_mutation_tsv.py \
+            --fasta {input.fasta} \
+            --reference {params.reference_name} \
+            --timeline {input.timeline} \
+            --basecnt "{params.basecnt_pattern}" \
+            --location "{params.location_name}" \
+            --location_code {params.location_code} \
+            --time_start {params.time_start} \
+            --time_end {params.time_end} \
+            --threshold {params.threshold} \
+            --rare_mutation_days {params.rare_days} \
+            --coverage_threshold {params.cov_threshold} \
+            --output {output.mutations_tsv} \
         &> {log}
         """
 
-rule downsample_fasta:
-    """
-    input: fasta file of amplicon reads
-    output: downsampled fasta file of amplicon reads
-    """
+
+rule extract_insert_coordinates:
+    """Extract amplicon coordinates from BED file"""
     input:
-        fasta=f"{output_dir}/{{location}}/{{amplicon}}/{{sample}}/amp_fused_sorted.fasta"
+        bed=lambda wildcards: config["amplicons"][wildcards.amplicon]["bedfile"]
     output:
-        downsampled_fasta=f"{output_dir}/{{location}}/{{amplicon}}/{{sample}}/downsampled_amp_reads.fasta"
+        f"{output_dir}/{{location}}/{{amplicon}}/bed_annotated.tsv"
+    run:
+        import sys
+        sys.path.insert(0, "scripts")
+        from load_bed import load_bed
+        bed = load_bed(input.bed)
+        bed.to_csv(output[0], sep='\t', index=False)
+
+
+rule make_amplicons_dict:
+    """Create amplicons dictionary mapping amplicon regions to mutations"""
+    input:
+        bedfile=f"{output_dir}/{{location}}/{{amplicon}}/bed_annotated.tsv",
+        mut_dict=f"{output_dir}/{{location}}/{{amplicon}}/mut_dict.yaml"
+    output:
+        f"{output_dir}/{{location}}/{{amplicon}}/amp_dict.yaml"
     log:
-        f"logs/{{location}}/{{amplicon}}/{{sample}}/downsample_fasta.log"
+        f"logs/{{location}}/{{amplicon}}/make_amplicons_dict.log"
+    script:
+        "scripts/make_amplicons_dict.py"
+
+
+rule make_mut_dict:
+    """Create mutation dictionary from mutations.tsv"""
+    input:
+        mut_tsv=f"{output_dir}/{{location}}/samples/mutations.tsv"
+    output:
+        f"{output_dir}/{{location}}/{{amplicon}}/mut_dict.yaml"
+    run:
+        from collections import defaultdict
+        import re, json, yaml
+        import pandas as pd
+
+        mut_tsv_df = pd.read_csv(input.mut_tsv, sep='\t')
+        i = mut_tsv_df['nucleotideMutationFrequency'].first_valid_index()
+        mut_dict = mut_tsv_df.loc[i, "nucleotideMutationFrequency"]
+        mut_list = list(json.loads(mut_dict).keys())
+
+        mut_list_dict = defaultdict(list)
+        pos = lambda x: int(re.search(r"\d+", x).group())
+        var = lambda x: re.split(r"\d+", x)[1]
+
+        for m in mut_list:
+            mut_list_dict[str(pos(m))].append(var(m))
+
+        with open(output[0], 'w') as file:
+            yaml.safe_dump(dict(mut_list_dict), file, default_flow_style=False)
+
+
+rule scanbam:
+    """Scan amplicon BAM for mutation co-occurrences (raw counts, not normalised)"""
+    input:
+        fused_bam=f"{output_dir}/{{location}}/{{amplicon}}/{{sample}}/amp_fused_sorted.bam",
+        fused_bam_bai=f"{output_dir}/{{location}}/{{amplicon}}/{{sample}}/amp_fused_sorted.bam.bai",
+        amplicons_dict=f"{output_dir}/{{location}}/{{amplicon}}/amp_dict.yaml"
+    output:
+        output=f"{output_dir}/{{location}}/{{amplicon}}/{{sample}}/cooccurrences_summarized.csv"
     params:
-        sample_name="{sample}",
-        amplicon_name="{amplicon}",
-        proportion=config["percentage_subsample"]
+        phred=config["phred_score_threshold"],
+        reference=REFERENCE_NAME
+    log:
+        f"logs/{{location}}/{{amplicon}}/{{sample}}/scanbam.log"
+    threads: 4
+    script:
+        "scripts/scan_bam.py"
+
+#TODO: ideally could get rud of load bed function cause reading in start sites above
+rule generate_amp_read_versions:
+    """Reconstruct unique amplicon reads and record raw counts per read version"""
+    input:
+        csv_file=f"{output_dir}/{{location}}/{{amplicon}}/{{sample}}/cooccurrences_summarized.csv",
+        fasta=REFERENCE,
+        amp=f"{output_dir}/{{location}}/{{amplicon}}/amp_dict.yaml",
+        bed=lambda wildcards: config["amplicons"][wildcards.amplicon]["bedfile"]
+    output:
+        fasta=f"{output_dir}/{{location}}/{{amplicon}}/{{sample}}/simulated_amp_reads.fasta",
+        tsv=f"{output_dir}/{{location}}/{{amplicon}}/{{sample}}/read_counts.tsv"
+    params:
+        sample="{sample}",
+        amplicon="{amplicon}",
+        location="{location}"
+    log:
+        f"logs/{{location}}/{{amplicon}}/{{sample}}/simulating_amp_reads.log"
     shell:
         """
-        cat {input.fasta} | seqkit sample2 -r -p {params.proportion} -o {output.downsampled_fasta}  &> {log}
+        python scripts/simulate_reads.py \
+            {input.csv_file} {input.fasta} {input.amp} {input.bed} \
+            "{params.sample}" "{params.amplicon}" "{params.location}" \
+            {output.fasta} {output.tsv} \
+        &> {log}
         """
+
+
+# rule bam_to_fasta:
+#     """
+#     input: fused bam file of amplicon reads
+#     output: fasta file of amplicon reads
+#     """
+#     input:
+#         bam=f"{output_dir}/{{location}}/{{amplicon}}/{{sample}}/amp_fused_sorted.bam"
+#     output:
+#         fasta=f"{output_dir}/{{location}}/{{amplicon}}/{{sample}}/amp_fused_sorted.fasta"
+#     log:
+#         f"logs/{{location}}/{{amplicon}}/{{sample}}/amp_bam_to_fasta.log"
+#     params:
+#         sample_name="{sample}",
+#         amplicon_name="{amplicon}"
+#     shell:
+#         """
+#         python scripts/BamToFasta.py \
+#             -i {input.bam} \
+#             -o {output.fasta} \
+#             -s {params.sample_name} \
+#             -a {params.amplicon_name} \
+#         &> {log}
+#         """
+
+# rule downsample_fasta:
+#     """
+#     input: fasta file of amplicon reads
+#     output: downsampled fasta file of amplicon reads
+#     """
+#     input:
+#         fasta=f"{output_dir}/{{location}}/{{amplicon}}/{{sample}}/amp_fused_sorted.fasta"
+#     output:
+#         downsampled_fasta=f"{output_dir}/{{location}}/{{amplicon}}/{{sample}}/downsampled_amp_reads.fasta"
+#     log:
+#         f"logs/{{location}}/{{amplicon}}/{{sample}}/downsample_fasta.log"
+#     params:
+#         sample_name="{sample}",
+#         amplicon_name="{amplicon}",
+#         proportion=config["percentage_subsample"]
+#     shell:
+#         """
+#         cat {input.fasta} | seqkit sample2 -r -p {params.proportion} -o {output.downsampled_fasta}  &> {log}
+#         """
 
 # ------------------------------------------------------------
 # Aggregation rules (combine samples per location × amplicon)
 # ------------------------------------------------------------
 
-rule combine_downsamples_amp_reads:
-    """Combine all downsampled reads for a location/amplicon"""
+rule combine_amp_read_versions:
+    """Combine all read versions for a location/amplicon"""
     input:
-        individual_fastas=get_location_fastas
+        individual_fastas=get_location_read_version
     output:
-        combined_fasta=f"{output_dir}/{{location}}/{{amplicon}}/combined_downsampled_amp_reads.fasta"
+        combined_fasta=f"{output_dir}/{{location}}/{{amplicon}}/combined_amp_reads_versions.fasta"
     log:
-        f"logs/{{location}}/{{amplicon}}/combining_downsampled_amp_reads.log"
+        f"logs/{{location}}/{{amplicon}}/combining_amp_read_versions.log"
     shell:
         "cat {input.individual_fastas} > {output.combined_fasta} 2> {log}"
+
+
+rule combine_amp_read_versions_counts:
+    """Combine all read version count files for a location/amplicon"""
+    input:
+        individual_counts=get_location_read_version_counts
+    output:
+        combined_counts=f"{output_dir}/{{location}}/{{amplicon}}/combined_amp_read_versions_counts.tsv"
+    log:
+        f"logs/{{location}}/{{amplicon}}/combining_amp_read_versions_counts.log"
+    shell:
+        "cat {input.individual_counts} > {output.combined_counts} 2> {log}"
 
 rule combining_amplicon_coverage:
     """Combine all coverage files for a location/amplicon"""

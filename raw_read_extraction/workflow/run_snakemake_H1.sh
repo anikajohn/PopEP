@@ -1,9 +1,9 @@
 #!/bin/bash
-#SBATCH --job-name=H1RawReadExtraction   
-#SBATCH --output=snakemake.out         
+#SBATCH --job-name=H1HaploReads  
+#SBATCH --output=H1HaploReads.out         
 #SBATCH --mail-user="anika.john@bsse.ethz.ch"
 #SBATCH --mail-type=END,BEGIN
-#SBATCH --error=snakemake.err        
+#SBATCH --error=H1HaploReads.err        
 #SBATCH --ntasks=1                  
 #SBATCH --cpus-per-task=50
 #SBATCH --time=96:00:00             
@@ -20,7 +20,7 @@
 
 
 snakemake --cores 140 \
- --configfile config/H1_25_26/config.yaml \
+ --configfile config/H1_24_25/config.yaml \
  --profile profile_simple/ \
  --show-failed-logs 
 

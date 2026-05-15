@@ -10,12 +10,22 @@ reference: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_Vacc
 reference_name: "CY121680.1"
 reference_index: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/Lollijac/resources/H1.fasta.fai"
 
-output_dir: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/raw_read_extraction/workflow/results_H1_24_25"
+output_dir: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/raw_read_extraction/workflow/results_haplo_H1_24_25"
 
 minimal_read_length: 200 # shorter fragments are filtered out
 minimal_read_mapping_quality: 9
 buffer: 20
-percentage_subsample: 0.5
+# percentage_subsample: 0.5
+
+#mutation filtering parameters (set to not filter anything basically)
+threshold_value: 0.000000000000001
+rare_mutation_limit_days: 1
+coverage_threshold: 1
+phred_score_threshold: 20
+
+
+
+
 
 # Amplicon-specific BED files
 #after empirical analysis of fused paired reads (approx. amplicons), saw that amplicon2's theoretical coordinates were not accurate, 
