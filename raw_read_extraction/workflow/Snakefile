@@ -1,0 +1,328 @@
+# from logging import config
+import pandas as pd
+import glob
+import yaml
+import re
+
+
+# ============================================================
+# WORKAROUND RULES TO USE LOLLIJAC OUTPUT AS INPUT
+# ============================================================
+PATH_TO_DATA = config["path_to_data"] 
+
+AMPLICONS = list(config["amplicons"].keys())
+LOCATIONS = list(config["locations"].keys())
+
+# input_dir = config['results_dir']
+output_dir = config['output_dir']
+
+READ_LEN = config['minimal_read_length']
+READ_MAPQ = config['minimal_read_mapping_quality']
+
+REFERENCE = config["reference"]
+REFERENCE_NAME = config["reference_name"]
+REFERENCE_INDEX = config["reference_index"]
+
+
+def get_location_name(wildcards):
+    """Get human-readable location name"""
+    return config["locations"][wildcards.location]["location_name"]
+
+def get_location_code(wildcards):
+    """Get location code"""
+    return config["locations"][wildcards.location]["location_code"]
+
+def get_amplicon_coords(wildcards):
+    """Extract start/end from BED file"""
+    bedfile = config["amplicons"][wildcards.amplicon]["bedfile"]
+    with open(bedfile) as f:
+        for line in f:
+            if not line.startswith('#'):
+                fields = line.strip().split('\t')
+                return {"start": fields[1], "end": fields[2]}
+    raise ValueError(f"No coordinates found in {bedfile}")
+
+def get_bam_file(wildcards):
+    """Find BAM file for a sample at a location"""
+    path_to_data = PATH_TO_DATA
+    pattern = f"{path_to_data}/{wildcards.sample}/alignments/REF_aln_trim.bam"
+    files = glob.glob(pattern)
+    if not files:
+        raise ValueError(f"No BAM file found: {pattern}")
+    return files[0]
+
+# Dynamic sample discovery using checkpoint
+def get_samples_for_location(wildcards):
+    """Read samples from generated samples.yaml"""
+    samples_file = checkpoints.prep_samples_yaml.get(location=wildcards.location).output.samples_yaml
+    with open(samples_file) as f:
+        return yaml.safe_load(f)["sample_batch"]
+    
+
+def get_location_fastas(wildcards):
+    """Get all sample FASTA files for a location/amplicon combination"""
+    samples = get_samples_for_location(wildcards)
+    return expand(
+        f"{output_dir}/{wildcards.location}/{wildcards.amplicon}/{{sample}}/downsampled_amp_reads.fasta",
+        sample=samples
+    )
+
+def get_location_covs(wildcards):
+    """Get all sample coverage files for a location/amplicon combination"""
+    samples = get_samples_for_location(wildcards)
+    return expand(
+        f"{output_dir}/{wildcards.location}/{wildcards.amplicon}/{{sample}}/amp_coverage.txt",
+        sample=samples
+    )
+
+def get_all_fused_bams(wildcards):
+    """Get all fused BAM files across all locations (for targeting get_fused_bam)"""
+    all_bams = []
+    for location in LOCATIONS:
+        # Create a simple object with location attribute to satisfy get_samples_for_location
+        samples = get_samples_for_location(type('obj', (object,), {'location': location})())
+        all_bams.extend(expand(
+            f"{output_dir}/{location}/samples/{{sample}}/{{sample}}_fused_sorted.bam",
+            sample=samples
+        ))
+    return all_bams
+
+
+# ============================================================
+# Rules
+# ============================================================
+
+
+wildcard_constraints:
+    sample="[^/]+/[^/]+",      # Matches 'sample/batch'
+    location="[^/]+",          # Prevents location from grabbing extra slashes
+    amplicon="[^/]+"           # Prevents amplicon from grabbing extra slashes
+
+rule all:
+    input:
+        expand(f"{output_dir}/{{location}}/{{amplicon}}/combined_downsampled_amp_reads.fasta", location=LOCATIONS, amplicon=AMPLICONS),
+        expand(f"{output_dir}/{{location}}/{{amplicon}}/combined_amp_coverage.txt", location=LOCATIONS, amplicon=AMPLICONS)
+
+rule all_fused_bams:
+    """Target rule to run only get_fused_bam for all samples (no downstream rules)"""
+    input:
+        get_all_fused_bams
+
+
+# ------------------------------------------------------------
+# Global rules (run once for entire workflow)
+# ------------------------------------------------------------
+
+rule making_timeline:
+    """Generate timeline.tsv by scanning path_to_data directory"""
+    output:
+        timeline=f"{output_dir}/timeline.tsv"
+    params:
+        base_dir=PATH_TO_DATA
+    log:
+        f"logs/making_timeline.log"
+    shell:
+        """
+        bash scripts/making_timeline.sh \
+            {params.base_dir} \
+            {output.timeline} \
+        &> {log}
+        """
+
+
+# ------------------------------------------------------------
+# Location-level rules (run once per location)
+# ------------------------------------------------------------
+
+# NOT SURE YET, needs to become command line
+checkpoint prep_samples_yaml:
+    """Generate samples.yaml by filtering timeline for a location"""
+    input:
+        timeline=f"{output_dir}/timeline.tsv"
+    output:
+        samples_yaml=f"{output_dir}/{{location}}/samples/samples.yaml"
+    params:
+        datefrom=config["time_start"],
+        dateto=config["time_end"],
+        location_name=get_location_name  # e.g., "Zürich (ZH)"
+    log:
+        f"logs/{{location}}/samples/prep_samples_yaml.log"
+    shell:
+        """
+        python scripts/prep_samples_yaml.py \
+            {input.timeline} \
+            {params.datefrom} \
+            {params.dateto} \
+            "{params.location_name}" \
+            {output.samples_yaml} \
+        &> {log}
+        """
+
+
+rule get_fused_bam:
+    """
+    input: alignment of reads;
+    output: sequences of the amplicons (fused reads) in sam file format
+    """
+    input:
+        bam=get_bam_file
+    output:
+        sam=temp(f"{output_dir}/{{location}}/samples/{{sample}}/{{sample}}.sam"),
+        sorted_sam=temp(f"{output_dir}/{{location}}/samples/{{sample}}/{{sample}}_sorted.sam"),
+        fused_amp=temp(f"{output_dir}/{{location}}/samples/{{sample}}/{{sample}}_fused.sam"),
+        fused_bam=temp(f"{output_dir}/{{location}}/samples/{{sample}}/{{sample}}_fused.bam"),
+        fused_length_filt_bam=temp(f"{output_dir}/{{location}}/samples/{{sample}}/{{sample}}_fused_length_filt.bam"),
+        fused_length_mapq_filt_bam=temp(f"{output_dir}/{{location}}/samples/{{sample}}/{{sample}}_fused_length_mapq_filt.bam"),
+        fused_sorted_bam_initial=temp(f"{output_dir}/{{location}}/samples/{{sample}}/{{sample}}_fused_sorted_initial.bam"),
+        fused_indexed_bam_initial=temp(f"{output_dir}/{{location}}/samples/{{sample}}/{{sample}}_fused_sorted_initial.bam.bai"),
+        fused_sorted_bam=f"{output_dir}/{{location}}/samples/{{sample}}/{{sample}}_fused_sorted.bam",
+        fused_indexed_bam=f"{output_dir}/{{location}}/samples/{{sample}}/{{sample}}_fused_sorted.bam.bai"
+    log:
+        f"logs/{{location}}/samples/{{sample}}/{{sample}}_get_fused_bam.log"
+    params:
+        len=READ_LEN,
+        mapq=READ_MAPQ
+    shell:
+        """
+        # prepare input
+        samtools view -h -T {REFERENCE} -t {REFERENCE_INDEX} {input.bam} > {output.sam}
+        samtools sort -O sam -n {output.sam} > {output.sorted_sam}
+
+        # run paired_end_read_merger to get sam of fused amplicons)
+        paired_end_read_merger --ref {REFERENCE} --output {output.fused_amp} {output.sorted_sam}
+
+        # convert fused sam to bam
+        samtools view -bS {output.fused_amp} > {output.fused_bam}
+
+        # filter reads shorter than len (after fusing)
+        samtools view -h {output.fused_bam} | awk 'BEGIN {{OFS="\t"}} /^@/ {{print; next}} length($10) >= {params.len}' | samtools view -bS - > {output.fused_length_filt_bam}
+        # select reads above mapq mapping quality
+        samtools view -h -b -q {params.mapq} {output.fused_length_filt_bam} -o {output.fused_length_mapq_filt_bam}
+        # sort and index fused bam
+        samtools sort {output.fused_length_mapq_filt_bam} -o {output.fused_sorted_bam_initial}
+        samtools index {output.fused_sorted_bam_initial}
+
+        #THIS PROBS ARTIFACT
+        # MN908947.3 is the same isolate and identical sequence as accession NC_045512.2 
+        # Reheader BAM files if the header is MN908947.3 -> NC_045512.2
+        samtools reheader -c 'perl -pe "s/MN908947\.3/NC_045512.2/"' {output.fused_sorted_bam_initial} > {output.fused_sorted_bam}
+        samtools index {output.fused_sorted_bam}
+        """
+    
+rule extract_amplicon_reads:
+    """
+    input: downsampled fasta file of amplicon reads
+    output: reads mapped to amplicon regions in fasta format
+    """
+    input:
+        fasta=f"{output_dir}/{{location}}/samples/{{sample}}/{{sample}}_fused_sorted.bam"
+    output:
+        amplicon_bam_unsorted=temp(f"{output_dir}/{{location}}/{{amplicon}}/{{sample}}/amp_fused.bam"),
+        amplicon_bam=f"{output_dir}/{{location}}/{{amplicon}}/{{sample}}/amp_fused_sorted.bam"
+    params:
+        buffer=config['buffer'],
+        start=lambda wildcards: get_amplicon_coords(wildcards)["start"],
+        end=lambda wildcards: get_amplicon_coords(wildcards)["end"]
+    log:
+        f"logs/{{location}}/{{amplicon}}/{{sample}}/combine_amplicon_reads.log"
+    shell:
+        """
+        python scripts/filtering_bam.py -i {input.fasta} -o {output.amplicon_bam_unsorted} -s {params.start} -e {params.end} -b {params.buffer} 
+        samtools sort {output.amplicon_bam_unsorted} -o {output.amplicon_bam}
+        samtools index {output.amplicon_bam}
+        &> {log}
+        """
+
+rule amplicon_coverage:
+    """
+    input: bam file of amplicon reads
+    output: coverage file of amplicon reads
+    """
+    input:
+        bam=f"{output_dir}/{{location}}/{{amplicon}}/{{sample}}/amp_fused_sorted.bam"
+    output:
+        coverage=f"{output_dir}/{{location}}/{{amplicon}}/{{sample}}/amp_coverage.txt"
+    log:
+        f"logs/{{location}}/{{amplicon}}/{{sample}}/amp_coverage.log"
+    params:
+        sample = "{sample}",
+        amplicon = "{amplicon}"
+    shell:
+        """
+        samtools coverage {input.bam} | \
+        awk 'NR==1 {{print "{params.sample}\\t{params.amplicon}\\t" $0; next}} {{print "{params.sample}\\t{params.amplicon}\\t" $0}}' > {output.coverage} \
+        2> {log}
+        """
+
+rule bam_to_fasta:
+    """
+    input: fused bam file of amplicon reads
+    output: fasta file of amplicon reads
+    """
+    input:
+        bam=f"{output_dir}/{{location}}/{{amplicon}}/{{sample}}/amp_fused_sorted.bam"
+    output:
+        fasta=f"{output_dir}/{{location}}/{{amplicon}}/{{sample}}/amp_fused_sorted.fasta"
+    log:
+        f"logs/{{location}}/{{amplicon}}/{{sample}}/amp_bam_to_fasta.log"
+    params:
+        sample_name="{sample}",
+        amplicon_name="{amplicon}"
+    shell:
+        """
+        python scripts/BamToFasta.py \
+            -i {input.bam} \
+            -o {output.fasta} \
+            -s {params.sample_name} \
+            -a {params.amplicon_name} \
+        &> {log}
+        """
+
+rule downsample_fasta:
+    """
+    input: fasta file of amplicon reads
+    output: downsampled fasta file of amplicon reads
+    """
+    input:
+        fasta=f"{output_dir}/{{location}}/{{amplicon}}/{{sample}}/amp_fused_sorted.fasta"
+    output:
+        downsampled_fasta=f"{output_dir}/{{location}}/{{amplicon}}/{{sample}}/downsampled_amp_reads.fasta"
+    log:
+        f"logs/{{location}}/{{amplicon}}/{{sample}}/downsample_fasta.log"
+    params:
+        sample_name="{sample}",
+        amplicon_name="{amplicon}",
+        proportion=config["percentage_subsample"]
+    shell:
+        """
+        cat {input.fasta} | seqkit sample2 -r -p {params.proportion} -o {output.downsampled_fasta}  &> {log}
+        """
+
+# ------------------------------------------------------------
+# Aggregation rules (combine samples per location × amplicon)
+# ------------------------------------------------------------
+
+rule combine_downsamples_amp_reads:
+    """Combine all downsampled reads for a location/amplicon"""
+    input:
+        individual_fastas=get_location_fastas
+    output:
+        combined_fasta=f"{output_dir}/{{location}}/{{amplicon}}/combined_downsampled_amp_reads.fasta"
+    log:
+        f"logs/{{location}}/{{amplicon}}/combining_downsampled_amp_reads.log"
+    shell:
+        "cat {input.individual_fastas} > {output.combined_fasta} 2> {log}"
+
+rule combining_amplicon_coverage:
+    """Combine all coverage files for a location/amplicon"""
+    input:
+        individual_cov=get_location_covs
+    output:
+        combined_cov=f"{output_dir}/{{location}}/{{amplicon}}/combined_amp_coverage.txt"
+    log:
+        f"logs/{{location}}/{{amplicon}}/combining_regional_coverage.log"
+    shell:
+        """
+        head -n 1 {input.individual_cov[0]} > {output.combined_cov}
+        tail -n +2 -q {input.individual_cov} >> {output.combined_cov} 2> {log}
+        """

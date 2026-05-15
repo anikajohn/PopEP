@@ -1,0 +1,60 @@
+# ============================================================
+# Configurations for raw read extraction 
+# ============================================================
+
+path_to_data: "/cluster/project/pangolin/processes/influenza/IA_H1/vpipe_output"
+time_start: "2025-11-01"
+time_end: "2026-03-31"
+
+reference: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/Lollijac/resources/H1.fasta"
+reference_name: "CY121680.1"
+reference_index: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/Lollijac/resources/H1.fasta.fai"
+
+output_dir: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/raw_read_extraction/workflow/results_H1_25_26"
+
+minimal_read_length: 200 # shorter fragments are filtered out
+minimal_read_mapping_quality: 9
+buffer: 20
+percentage_subsample: 0.5
+
+# Amplicon-specific BED files
+#after empirical analysis of fused paired reads (approx. amplicons), saw that amplicon2's theoretical coordinates were not accurate, 
+#so I created a new bed file for amplicon2 based on the observed coordinates of the fused paired reads. 
+#The other amplicons' theoretical coordinates were accurate, so I kept the original bed files for those.
+amplicons:
+#   amplicon1:
+#     bedfile: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/Lollijac/resources/H1.amp1.insert.bed"
+  amplicon2:
+    bedfile: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/raw_read_extraction/workflow/resources/H1.amp2.insert.empirical.bed"
+  amplicon3:
+    bedfile: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/Lollijac/resources/H1.amp3.insert.bed"
+  amplicon4:
+    bedfile: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/Lollijac/resources/H1.amp4.insert.bed"
+  amplicon5:
+    bedfile: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/Lollijac/resources/H1.amp5.insert.bed"
+  amplicon6:
+    bedfile: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/Lollijac/resources/H1.amp6.insert.bed"
+
+#Luzern and Altenrhein are not included in the analysis as they had very low coverage and no mutations detected.
+
+locations:
+  zurich:
+    location_name: "Zürich (ZH)"
+    location_code: '10'
+  lugano:
+    location_name: "Lugano (TI)"
+    location_code: '05'
+  basel:
+    location_name: "Basel (BS)"
+    location_code: '15'
+  geneve:
+    location_name: "Genève (GE)"
+    location_code: '16'
+  chur:
+    location_name: "Chur (GR)"
+    location_code: '17'
+  laupen:
+    location_name: "Laupen (BE)"
+    location_code: '25'
+
+

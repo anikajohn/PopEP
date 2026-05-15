@@ -1,0 +1,60 @@
+# ============================================================
+# Configurations for raw read extraction 
+# ============================================================
+
+path_to_data: "/cluster/project/pangolin/old_setup/not_necessary/influenza_pipeline/IA_N1/working/results"
+time_start: "2024-11-01"
+time_end: "2025-04-30"
+
+reference: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/raw_read_extraction/workflow/resources/N1/MW626056/N1.fasta"
+reference_name: "MW626056.1"
+reference_index: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/raw_read_extraction/workflow/resources/N1/MW626056/N1.fasta.fai"
+
+output_dir: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/raw_read_extraction/workflow/results_N1_24_25"
+
+minimal_read_length: 200 # shorter fragments are filtered out
+minimal_read_mapping_quality: 9
+buffer: 30 #empirically determined
+percentage_subsample: 0.5
+
+# Amplicon-specific BED files
+amplicons:
+#   amplicon1:
+#     bedfile: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/Lollijac/resources/N1.amp1.insert.bed"
+  amplicon2:
+    bedfile: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/raw_read_extraction/workflow/resources/N1/N1.amp2.insert.dummy.bed"
+  amplicon3:
+    bedfile: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/raw_read_extraction/workflow/resources/N1/N1.amp3.insert.dummy.bed"
+  amplicon4:
+    bedfile: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/raw_read_extraction/workflow/resources/N1/N1.amp4.insert.dummy.bed"
+  # amplicon5:
+  #   bedfile: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/Lollijac/resources/N1.amp5.insert.bed"
+  
+#Luzern and Altenrhein are not included in the analysis as they had very low coverage and no mutations detected.
+
+locations:
+  zurich:
+    location_name: "Zürich (ZH)"
+    location_code: '10'
+  lugano:
+    location_name: "Lugano (TI)"
+    location_code: '05'
+  basel:
+    location_name: "Basel (BS)"
+    location_code: '15'
+  geneve:
+    location_name: "Genève (GE)"
+    location_code: '16'
+  chur:
+    location_name: "Chur (GR)"
+    location_code: '17'
+  laupen:
+    location_name: "Laupen (BE)"
+    location_code: '25'
+  altenrhein:
+    location_name: "Altenrhein (SG)"
+    location_code: '19'
+  luzern:
+    location_name: "Luzern (LU)"
+    location_code: '18'
+
