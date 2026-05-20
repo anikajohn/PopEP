@@ -22,7 +22,8 @@
 snakemake --cores 140 \
  --configfile config/H1_24_25/config.yaml \
  --profile profile_simple/ \
- --show-failed-logs 
+ --show-failed-logs \
+ --rerun-triggers mtime
 
 
 
