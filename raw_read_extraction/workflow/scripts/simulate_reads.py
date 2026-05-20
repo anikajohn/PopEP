@@ -1,3 +1,4 @@
+import sys
 import yaml
 import csv
 import ast
@@ -6,7 +7,7 @@ from Bio.SeqRecord import SeqRecord
 from Bio.Seq import Seq
 import argparse
 
-csv.field_size_limit(100000000)
+csv.field_size_limit(sys.maxsize)
 
 
 def read_amp_dict_yaml(file_path):
@@ -38,7 +39,7 @@ def simulate_mutated_reads(csv_file_path, fasta_file, amp_file, bed_file, sample
     records = list(SeqIO.parse(fasta_file, "fasta"))
     pos_mutated = list(amp_dict.keys())
 
-    start = int(bed['start'].iloc[0] - 1)  # 0-based
+    start = int(bed['start'].iloc[0])  # BED start is already 0-based
     stop = int(bed['stop'].iloc[0])
 
     possible_reads = []
