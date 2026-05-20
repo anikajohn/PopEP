@@ -109,7 +109,7 @@ def get_all_fused_bams(wildcards):
         # Create a simple object with location attribute to satisfy get_samples_for_location
         samples = get_samples_for_location(type('obj', (object,), {'location': location})())
         all_bams.extend(expand(
-            f"{output_dir}/{location}/samples/{{sample}}/{{sample}}_fused_sorted.bam",
+            f"{output_dir}/{location}/samples/{{sample}}/fused_sorted.bam",
             sample=samples
         ))
     return all_bams
@@ -195,18 +195,18 @@ rule get_fused_bam:
     input:
         bam=get_bam_file
     output:
-        sam=temp(f"{output_dir}/{{location}}/samples/{{sample}}/{{sample}}.sam"),
-        sorted_sam=temp(f"{output_dir}/{{location}}/samples/{{sample}}/{{sample}}_sorted.sam"),
-        fused_amp=temp(f"{output_dir}/{{location}}/samples/{{sample}}/{{sample}}_fused.sam"),
-        fused_bam=temp(f"{output_dir}/{{location}}/samples/{{sample}}/{{sample}}_fused.bam"),
-        fused_length_filt_bam=temp(f"{output_dir}/{{location}}/samples/{{sample}}/{{sample}}_fused_length_filt.bam"),
-        fused_length_mapq_filt_bam=temp(f"{output_dir}/{{location}}/samples/{{sample}}/{{sample}}_fused_length_mapq_filt.bam"),
-        fused_sorted_bam_initial=temp(f"{output_dir}/{{location}}/samples/{{sample}}/{{sample}}_fused_sorted_initial.bam"),
-        fused_indexed_bam_initial=temp(f"{output_dir}/{{location}}/samples/{{sample}}/{{sample}}_fused_sorted_initial.bam.bai"),
-        fused_sorted_bam=f"{output_dir}/{{location}}/samples/{{sample}}/{{sample}}_fused_sorted.bam",
-        fused_indexed_bam=f"{output_dir}/{{location}}/samples/{{sample}}/{{sample}}_fused_sorted.bam.bai"
+        sam=temp(f"{output_dir}/{{location}}/samples/{{sample}}/reads.sam"),
+        sorted_sam=temp(f"{output_dir}/{{location}}/samples/{{sample}}/reads_sorted.sam"),
+        fused_amp=temp(f"{output_dir}/{{location}}/samples/{{sample}}/fused_amp.sam"),
+        fused_bam=temp(f"{output_dir}/{{location}}/samples/{{sample}}/fused.bam"),
+        fused_length_filt_bam=temp(f"{output_dir}/{{location}}/samples/{{sample}}/fused_length_filt.bam"),
+        fused_length_mapq_filt_bam=temp(f"{output_dir}/{{location}}/samples/{{sample}}/fused_length_mapq_filt.bam"),
+        fused_sorted_bam_initial=temp(f"{output_dir}/{{location}}/samples/{{sample}}/fused_sorted_initial.bam"),
+        fused_indexed_bam_initial=temp(f"{output_dir}/{{location}}/samples/{{sample}}/fused_sorted_initial.bam.bai"),
+        fused_sorted_bam=f"{output_dir}/{{location}}/samples/{{sample}}/fused_sorted.bam",
+        fused_indexed_bam=f"{output_dir}/{{location}}/samples/{{sample}}/fused_sorted.bam.bai"
     log:
-        f"logs/{{location}}/samples/{{sample}}/{{sample}}_get_fused_bam.log"
+        f"logs/{{location}}/samples/{{sample}}/get_fused_bam.log"
     params:
         len=READ_LEN,
         mapq=READ_MAPQ
@@ -243,7 +243,7 @@ rule extract_amplicon_reads:
     output: reads mapped to amplicon regions in bam format
     """
     input:
-        bam=f"{output_dir}/{{location}}/samples/{{sample}}/{{sample}}_fused_sorted.bam"
+        bam=f"{output_dir}/{{location}}/samples/{{sample}}/fused_sorted.bam"
     output:
         amplicon_bam_unsorted=temp(f"{output_dir}/{{location}}/{{amplicon}}/{{sample}}/amp_fused.bam"),
         amplicon_bam=f"{output_dir}/{{location}}/{{amplicon}}/{{sample}}/amp_fused_sorted.bam",
@@ -256,10 +256,11 @@ rule extract_amplicon_reads:
         f"logs/{{location}}/{{amplicon}}/{{sample}}/combine_amplicon_reads.log"
     shell:
         """
-        python scripts/filtering_bam.py -i {input.bam} -o {output.amplicon_bam_unsorted} -s {params.start} -e {params.end} -b {params.buffer} 
+        {{
+        python scripts/filtering_bam.py -i {input.bam} -o {output.amplicon_bam_unsorted} -s {params.start} -e {params.end} -b {params.buffer}
         samtools sort {output.amplicon_bam_unsorted} -o {output.amplicon_bam}
         samtools index {output.amplicon_bam}
-        &> {log}
+        }} &> {log}
         """
 
 
@@ -280,9 +281,9 @@ rule amplicon_coverage:
         amplicon = "{amplicon}"
     shell:
         """
-        samtools coverage {input.bam} | \
+        ( samtools coverage {input.bam} 2> {log} || true ) | \
         awk 'NR==1 {{print "{params.sample}\\t{params.amplicon}\\t" $0; next}} {{print "{params.sample}\\t{params.amplicon}\\t" $0}}' > {output.coverage} \
-        2> {log}
+        2>> {log}
         """
 
 rule basecounts:
@@ -293,7 +294,7 @@ rule basecounts:
         COVERAGE=f"{output_dir}/{{location}}/{{amplicon}}/{{sample}}/alignments/coverage.tsv.gz",
         STATS=f"{output_dir}/{{location}}/{{amplicon}}/{{sample}}/alignments/REF_aln_stats.yaml"
     params:
-        NAME="{location}_{amplicon}_{sample}"
+        NAME=lambda wildcards: f"{wildcards.location}_{wildcards.amplicon}_{wildcards.sample.replace('/', '_')}"
     log:
         outfile=f"{output_dir}/{{location}}/{{amplicon}}/{{sample}}/alignments/basecounts.out.log",
         errfile=f"{output_dir}/{{location}}/{{amplicon}}/{{sample}}/alignments/basecounts.err.log"
@@ -315,7 +316,7 @@ rule generate_mutations_tsv:
     output:
         mutations_tsv=f"{output_dir}/{{location}}/samples/mutations.tsv"
     params:
-        basecnt_pattern=lambda wildcards: f"{output_dir}/{wildcards.location}/*/*/alignments/basecnt.tsv.gz",
+        basecnt_pattern=lambda wildcards: f"{output_dir}/{wildcards.location}/*/*/*/alignments/basecnt.tsv.gz",
         location_name=get_location_name,
         location_code=get_location_code,
         reference_name=REFERENCE_NAME,
@@ -359,25 +360,12 @@ rule extract_insert_coordinates:
         bed.to_csv(output[0], sep='\t', index=False)
 
 
-rule make_amplicons_dict:
-    """Create amplicons dictionary mapping amplicon regions to mutations"""
-    input:
-        bedfile=f"{output_dir}/{{location}}/{{amplicon}}/bed_annotated.tsv",
-        mut_dict=f"{output_dir}/{{location}}/{{amplicon}}/mut_dict.yaml"
-    output:
-        f"{output_dir}/{{location}}/{{amplicon}}/amp_dict.yaml"
-    log:
-        f"logs/{{location}}/{{amplicon}}/make_amplicons_dict.log"
-    script:
-        "scripts/make_amplicons_dict.py"
-
-
 rule make_mut_dict:
     """Create mutation dictionary from mutations.tsv"""
     input:
         mut_tsv=f"{output_dir}/{{location}}/samples/mutations.tsv"
     output:
-        f"{output_dir}/{{location}}/{{amplicon}}/mut_dict.yaml"
+        f"{output_dir}/{{location}}/samples/mut_dict.yaml"
     run:
         from collections import defaultdict
         import re, json, yaml
@@ -397,6 +385,20 @@ rule make_mut_dict:
 
         with open(output[0], 'w') as file:
             yaml.safe_dump(dict(mut_list_dict), file, default_flow_style=False)
+
+
+rule make_amplicons_dict:
+    """Create amplicons dictionary mapping amplicon regions to mutations"""
+    input:
+        bedfile=f"{output_dir}/{{location}}/{{amplicon}}/bed_annotated.tsv",
+        mut_dict=f"{output_dir}/{{location}}/samples/mut_dict.yaml"
+    output:
+        f"{output_dir}/{{location}}/{{amplicon}}/amp_dict.yaml"
+    log:
+        f"logs/{{location}}/{{amplicon}}/make_amplicons_dict.log"
+    script:
+        "scripts/make_amplicons_dict.py"
+
 
 
 rule scanbam:
@@ -431,6 +433,9 @@ rule generate_amp_read_versions:
         sample="{sample}",
         amplicon="{amplicon}",
         location="{location}"
+    resources:
+        mem_mb=80000,
+        mem_mb_per_cpu=80000
     log:
         f"logs/{{location}}/{{amplicon}}/{{sample}}/simulating_amp_reads.log"
     shell:
