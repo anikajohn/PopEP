@@ -8,8 +8,6 @@ require(optparse)
 option_list = list(
   make_option(c("-m", "--nextclade_meta_file"), action="store", default=NA, type='character',
               help="Path to coverage nextclade_metadata.tsv file (see rule merge_nextclade_meta_ww)"),
-  make_option(c("-i", "--THD_IDs"), action="store", default="usedSeq_IDs.tsv", 
-              type='character', help="Path to IDs of sequences used in THD_analysis.R"),
   make_option(c("-f", "--output_file"), action="store", 
               default="nextclade_metadata_processed.tsv", type='character', 
               help="Path to file used to generate plots"),
@@ -21,6 +19,8 @@ option_list = list(
               help="Path output plot (subclades by week)"),
   make_option(c("-a", "--amplicon_only"), action="store_true", default=FALSE,
               help="If TRUE, facet only by amplicon (default: FALSE, facet by location and amplicon)"),
+  make_option(c("-k", "--count_file"), action="store", default=NA, type='character',
+              help="Path to combined_amp_read_versions_counts.tsv file"),
   make_option(c("-c", "--colour_palette"), action="store", default=NA, type='character',
               help="path to json file with colour palette")
 )
@@ -35,7 +35,7 @@ opt = parse_args(OptionParser(option_list=option_list))
 
 nextclade_meta_file = opt$nextclade_meta_file
 
-readIDs_file = opt$THD_IDs
+count_file = opt$count_file
 
 palette_file = opt$colour_palette
 
@@ -55,24 +55,33 @@ amplicon_only = opt$amplicon_only
 
 ######PROCESSING######
 
-if (file.size(readIDs_file) == 0L){ 
+
+df_count = fread(count_file, sep="\t", header=TRUE)
+df_count = df_count[df_count$read_name != "read_name", ]
+df_count$count = as.numeric(df_count$count)
+
+
+if (nrow(df_count) == 0L){ 
   
-  print("No reads available, empty files outputted.")
+  print("No reads available, empty plot outputted.")
   
-  write.table(NULL,output_file, row.names = FALSE, col.names = FALSE)
-  file.create(output_plot_day)
-  file.create(output_plot_week)
+  empty_plot <- ggplot() + theme_void()
+  ggsave(output_plot_day, empty_plot, height = 6, width = 9)
+  ggsave(output_plot_week, empty_plot, height = 6, width = 9)
+  write.table(NULL, output_file, row.names = FALSE, col.names = FALSE)
   
 }else{
 
-  readIDs = fread(readIDs_file)
-  
-  dt = fread(nextclade_meta_file) %>% 
-    filter(seqName %in% as.list(readIDs)$usedIDs) %>% 
+  dt = fread(nextclade_meta_file, 
+             select = c("strain","legacy-clade","subclade", "date", "amplicon", "location")) %>% 
     mutate(`legacy-clade` = as.character(`legacy-clade`),
            week_date = floor_date(as.Date(date), unit = "week"),
            month_date = floor_date(as.Date(date), unit = "month"))
   
+  dt = merge(dt, df_count, by.x = c("strain", "amplicon", "location"), 
+             by.y = c("read_name", "amplicon", "location"))
+  
+
   
   ##### PLOTTING ######
   
@@ -102,20 +111,27 @@ if (file.size(readIDs_file) == 0L){
   
   
   
-  by_day = ggplot(dt, aes(fill=subclade, x=date )) + 
-    geom_bar(position="stack")+
+  dt_day <- dt %>%
+    group_by(date, subclade, amplicon, location) %>%
+    summarise(count_sum = sum(count, na.rm = TRUE), .groups = "drop")
+  
+  dt_week <- dt %>%
+    group_by(week_date, subclade, amplicon, location) %>%
+    summarise(count_sum = sum(count, na.rm = TRUE), .groups = "drop")
+  
+  by_day = ggplot(dt_day, aes(fill=subclade, x=date, y=count_sum)) + 
+    geom_col(position="stack")+
     scale_fill_manual(values = custom_palette) +
     {if(amplicon_only) facet_grid(cols = vars(amplicon)) else facet_grid(vars(location), vars(amplicon))} +
     theme(text = element_text(size = 20),
           axis.text.x = element_text(angle = 45, hjust = 1))
   
-  by_week = ggplot(dt, aes(fill=subclade, x=week_date )) + 
-    geom_bar(position="stack")+
+  by_week = ggplot(dt_week, aes(fill=subclade, x=week_date, y=count_sum)) + 
+    geom_col(position="stack")+
     scale_fill_manual(values = custom_palette) +
     {if(amplicon_only) facet_grid(cols = vars(amplicon)) else facet_grid(vars(location), vars(amplicon))} +
     theme(text = element_text(size = 20),
           axis.text.x = element_text(angle = 45, hjust = 1))
-  
   
   ##### OUTPUTTING ######
   
