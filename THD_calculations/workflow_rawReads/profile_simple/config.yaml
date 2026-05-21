@@ -1,10 +1,10 @@
 executor: slurm
 default-resources:
   slurm_account: "'es_beere'"
-  mem_mb_per_cpu: 2000
+  mem_mb: 4000
 restart-times: 3
-max-jobs-per-second: 10
-max-status-checks-per-second: 10
+max-jobs-per-second: 20
+max-status-checks-per-second: 20
 local-cores: 1
 latency-wait: 120
 jobs: 300
