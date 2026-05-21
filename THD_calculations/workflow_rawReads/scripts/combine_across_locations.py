@@ -6,10 +6,12 @@ parser.add_argument("--fasta-files", nargs="+", required=True, help="Input FASTA
 parser.add_argument("--metadata-files", nargs="+", required=True, help="Input metadata TSV files")
 parser.add_argument("--nextclade-meta-files", nargs="+", required=True, help="Input nextclade metadata TSV files")
 parser.add_argument("--coverage-files", nargs="+", required=True, help="Input coverage TSV files")
+parser.add_argument("--count-files", nargs="+", required=True, help="Input read version count TSV files")
 parser.add_argument("--out-fasta", required=True, help="Output combined FASTA file")
 parser.add_argument("--out-metadata", required=True, help="Output combined metadata TSV")
 parser.add_argument("--out-nextclade-meta", required=True, help="Output combined nextclade metadata TSV")
 parser.add_argument("--out-coverage", required=True, help="Output combined coverage TSV")
+parser.add_argument("--out-counts", required=True, help="Output combined read version counts TSV")
 
 args = parser.parse_args()
 
@@ -28,3 +30,4 @@ def combine_tsvs(file_list, output_path):
 combine_tsvs(args.metadata_files, args.out_metadata)
 combine_tsvs(args.nextclade_meta_files, args.out_nextclade_meta)
 combine_tsvs(args.coverage_files, args.out_coverage)
+combine_tsvs(args.count_files, args.out_counts)
