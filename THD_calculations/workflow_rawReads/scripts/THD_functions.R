@@ -182,6 +182,8 @@ genome_length,chunk_size = 500L, mc.cores = 1L){
   window_counts <- integer(n)
 
   df_count = read.table(count_file, sep="\t", header=TRUE)
+  df_count = df_count[df_count$read_name != "read_name", ]  # drop duplicate header rows
+  df_count$count = as.numeric(df_count$count)
   count <- df_count$count
   names(count) <- df_count$read_name
   count <- count[sample_ids] # align to matrix row/col order by name
@@ -229,6 +231,53 @@ genome_length,chunk_size = 500L, mc.cores = 1L){
 
   return(index)
 }
+
+
+#' Title
+#'
+#' @param distance_mat 
+#' @param time_window 
+#' @param metadata 
+#' @param mutation_rate 
+#' @param timescale 
+#' @param genome_length 
+#' @param nextclade nextclade DT
+#'
+#' @returns
+#' @export
+#'
+#' @examples
+compute.merge.haplo.results <- function(distance_mat,  time_window, metadata, 
+                                      mutation_rate, timescale, genome_length,
+                                      nextclade, count_file, mc.cores = 1L) {
+  
+  indicies <- compute.index.from.haplo.distance(distance_mat, 
+                                          count_file,
+                                          time_window, 
+                                          metadata, 
+                                          mutation_rate, 
+                                          timescale, 
+                                          genome_length,
+                                          mc.cores = mc.cores)
+  indicies = indicies[is.finite(indicies)]
+  
+  indicies_df = as.data.frame(indicies)
+  indicies_df$seqName <- rownames(indicies_df)
+  
+  df_results <- merge(nextclade[,.(index, seqName, subclade, `legacy-clade`)], 
+                      indicies_df, by = 'seqName') %>% 
+    merge(., metadata, by.x = 'seqName', by.y = 'ID')
+  
+  return(df_results)
+}
+
+
+
+
+
+
+
+
 
 
 
