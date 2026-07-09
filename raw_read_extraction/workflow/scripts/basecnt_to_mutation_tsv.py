@@ -69,7 +69,12 @@ def extract_sample_ID(timeline_file_dir, time_start, time_end, location):
     """Extract sample IDs from selected time period, location, and protocol."""
     timeline_file = pd.read_csv(timeline_file_dir, sep='\t', usecols=['sample', 'proto', 'date', 'location'],
                                 encoding='utf-8')
-    timeline_file["date"] = pd.to_datetime(timeline_file["date"])
+    
+    # some batch set ups had bugs in the name
+    timeline_file = timeline_file[~timeline_file['proto'].astype(str).str.contains('<built-in', na=False)]
+
+    timeline_file["date"] = pd.to_datetime(timeline_file["date"], errors='coerce', format='mixed')
+
 
     selected_rows = timeline_file[
         (timeline_file["date"] > time_start) &
@@ -87,7 +92,16 @@ def extract_cov(basecnt_tsv_file, sample_name, coverage_threshold):
         sep='\t',
         header=0,
         usecols=[2]).columns[0]
-    sample = re.split('/', sample_batch)[0]
+    
+    #different naming conventions in bascnt headers
+    if '/' in sample_batch:
+        sample = sample_batch.split('/')[0]
+    else:
+        if sample_name in sample_batch:
+            sample = sample_name
+        else:
+            sample = sample_batch
+
 
     if sample_name != sample:
         print(f"Sample name mismatch! Expected '{sample_name}', found '{sample}'.")
@@ -176,9 +190,19 @@ def main():
 
     nucleotide_mut_freq = collected_frequency.apply(create_mut_freq_dict, axis=0)
 
-    timeline_file = pd.read_csv(args.timeline, sep='\t', usecols=['sample', 'proto', 'date', 'location'],
+    timeline_file = pd.read_csv(args.timeline, sep='\t', usecols=['sample', 'proto', 'date', 'location', 'batch'],
                                 encoding='utf-8')
-    timeline_file["date"] = pd.to_datetime(timeline_file["date"])
+    
+    
+    #have 09-31 somewhere
+    timeline_file["date"] = pd.to_datetime(timeline_file["date"], errors='coerce')
+
+    # Filter out the rows with the broken Python regex object string (Sars-CoV-2) in the 'batch' column
+    timeline_file = timeline_file[~timeline_file['batch'].str.contains('method|<', na=False)]
+
+    #work-around cause origianlly batch column was not needed and (back to back compatibality with prep samples)
+    timeline_file = timeline_file.drop(columns=['batch'])
+
 
     selected_rows = timeline_file[
         (timeline_file["date"] > args.time_start) &

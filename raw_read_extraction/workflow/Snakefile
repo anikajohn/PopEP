@@ -249,18 +249,16 @@ rule extract_amplicon_reads:
         amplicon_bam=f"{output_dir}/{{location}}/{{amplicon}}/{{sample}}/amp_fused_sorted.bam",
         amplicon_bam_bai=f"{output_dir}/{{location}}/{{amplicon}}/{{sample}}/amp_fused_sorted.bam.bai"
     params:
-        buffer=config['buffer'],
         start=lambda wildcards: get_amplicon_coords(wildcards)["start"],
         end=lambda wildcards: get_amplicon_coords(wildcards)["end"]
     log:
         f"logs/{{location}}/{{amplicon}}/{{sample}}/combine_amplicon_reads.log"
     shell:
         """
-        {{
-        python scripts/filtering_bam.py -i {input.bam} -o {output.amplicon_bam_unsorted} -s {params.start} -e {params.end} -b {params.buffer}
+        python scripts/filtering_bam.py -i {input.bam} -o {output.amplicon_bam_unsorted} -s {params.start} -e {params.end} 
         samtools sort {output.amplicon_bam_unsorted} -o {output.amplicon_bam}
         samtools index {output.amplicon_bam}
-        }} &> {log}
+        &> {log}
         """
 
 
@@ -281,9 +279,9 @@ rule amplicon_coverage:
         amplicon = "{amplicon}"
     shell:
         """
-        ( samtools coverage {input.bam} 2> {log} || true ) | \
+        samtools coverage {input.bam} | \
         awk 'NR==1 {{print "{params.sample}\\t{params.amplicon}\\t" $0; next}} {{print "{params.sample}\\t{params.amplicon}\\t" $0}}' > {output.coverage} \
-        2>> {log}
+        2> {log}
         """
 
 rule basecounts:
@@ -294,12 +292,12 @@ rule basecounts:
         COVERAGE=f"{output_dir}/{{location}}/{{amplicon}}/{{sample}}/alignments/coverage.tsv.gz",
         STATS=f"{output_dir}/{{location}}/{{amplicon}}/{{sample}}/alignments/REF_aln_stats.yaml"
     params:
-        NAME=lambda wildcards: f"{wildcards.location}_{wildcards.amplicon}_{wildcards.sample.replace('/', '_')}"
+        NAME="{location}_{amplicon}_{sample}"
     log:
         outfile=f"{output_dir}/{{location}}/{{amplicon}}/{{sample}}/alignments/basecounts.out.log",
         errfile=f"{output_dir}/{{location}}/{{amplicon}}/{{sample}}/alignments/basecounts.err.log"
     resources:
-        disk_mb=1250
+        mem_per_cpu=1250
     threads: 1
     shell:
         """
@@ -327,6 +325,8 @@ rule generate_mutations_tsv:
         cov_threshold=config["coverage_threshold"]
     log:
         f"logs/{{location}}/samples/generate_mutations_tsv.log"
+    resources:
+        mem_per_cpu=50000
     shell:
         """
         python scripts/basecnt_to_mutation_tsv.py \
@@ -366,6 +366,8 @@ rule make_mut_dict:
         mut_tsv=f"{output_dir}/{{location}}/samples/mutations.tsv"
     output:
         f"{output_dir}/{{location}}/samples/mut_dict.yaml"
+    resources:
+        mem_per_cpu=50000
     run:
         from collections import defaultdict
         import re, json, yaml
@@ -396,6 +398,8 @@ rule make_amplicons_dict:
         f"{output_dir}/{{location}}/{{amplicon}}/amp_dict.yaml"
     log:
         f"logs/{{location}}/{{amplicon}}/make_amplicons_dict.log"
+    resources:
+        mem_per_cpu=50000
     script:
         "scripts/make_amplicons_dict.py"
 
@@ -412,6 +416,8 @@ rule scanbam:
     params:
         phred=config["phred_score_threshold"],
         reference=REFERENCE_NAME
+    resources:
+        mem_per_cpu=50000
     log:
         f"logs/{{location}}/{{amplicon}}/{{sample}}/scanbam.log"
     threads: 4
@@ -433,11 +439,10 @@ rule generate_amp_read_versions:
         sample="{sample}",
         amplicon="{amplicon}",
         location="{location}"
-    resources:
-        mem_mb=80000,
-        mem_mb_per_cpu=80000
     log:
         f"logs/{{location}}/{{amplicon}}/{{sample}}/simulating_amp_reads.log"
+    resources:
+        mem_per_cpu=50000
     shell:
         """
         python scripts/simulate_reads.py \

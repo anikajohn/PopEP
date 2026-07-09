@@ -1,7 +1,8 @@
-slurm: True #Snakemake 7 in lolliijac env
+cluster: "sbatch --account={resources.slurm_account} --time={resources.runtime} --mem-per-cpu={resources.mem_per_cpu} --cpus-per-task={threads} --output=logs/slurm-%j.out"
 default-resources:
   slurm_account: "'es_beere'"
-  mem_mb_per_cpu: 2000
+  runtime: 360
+  mem_per_cpu: 1250
 restart-times: 3
 max-jobs-per-second: 10
 max-status-checks-per-second: 10

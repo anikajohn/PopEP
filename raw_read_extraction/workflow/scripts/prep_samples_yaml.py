@@ -12,7 +12,10 @@ def extract_sample_ID(timeline_file_dir, datefrom, dateto, location):
     timeline_file = pd.read_csv(timeline_file_dir, sep = '\t', usecols = ['sample', 'batch', 'proto', 'date', 'location'],
                                 encoding='utf-8')
     # convert the "date" column to datetime type:
-    timeline_file["date"] = pd.to_datetime(timeline_file["date"])
+    timeline_file["date"] = pd.to_datetime(timeline_file["date"], errors='coerce')
+
+    # Filter out the rows with the broken Python regex object string (Sars-CoV-2) in the 'batch' column
+    timeline_file = timeline_file[~timeline_file['batch'].str.contains('method|<', na=False)]
 
     selected_rows = timeline_file[
         # select the rows with date from date 1 to date 2 (according to .tsv file)
