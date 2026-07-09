@@ -1,0 +1,83 @@
+# ============================================================
+# Configurations for Index calculation
+# ============================================================
+
+#mutation_rate = clock rate https://raw.githubusercontent.com/nextstrain/ncov/master/defaults/parameters.yaml
+mutation_rate: 0.0008
+timescales: "0.15,0.2,0.25,0.3,0.35,0.4"
+timewindows: "0.019,0.038,0.0833,0.15,0.23"
+colour_palette: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/THD_calculations/workflow_rawReads/resources/colour_palette/SarsCov2/colours.json"
+
+# ============================================================
+# Configurations for Nextclade classification
+# ============================================================
+
+# Column names in the nextclade TSV for subclade and legacy clade.
+# nextclade2: subclade_col: "subclade",  clade_col: "legacy-clade"
+# nextclade3: subclade_col: "partiallyAliased",  clade_col: "clade_who"
+nextclade_subclade_col: "partiallyAliased"
+nextclade_clade_col: "clade_who"
+
+input_dir: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/raw_read_extraction/workflow/results_haplo_SarsCov2_21_22"
+output_dir: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/THD_calculations/workflow_rawReads/results_haplo_SarsCov2_21_22"
+reference_dataset: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/THD_calculations/workflow_rawReads/resources/datasets/SarsCov2"
+
+# ============================================================
+# LolliJac configuration settings for SarsCov2 21/22 season 
+# ============================================================
+ 
+reference: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/raw_read_extraction/workflow/resources/SarsCov2_21_22/NC_045512.2.fasta"
+reference_name: "NC_045512.2"
+reference_index: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/raw_read_extraction/workflow/resources/SarsCov2_21_22/NC_045512.2.fasta.fai"
+
+
+amplicons:
+  amplicon71:
+    bedfile: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/raw_read_extraction/workflow/resources/SarsCov2_21_22/amp_71_overlap.bed"
+  amplicon72:
+    bedfile: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/raw_read_extraction/workflow/resources/SarsCov2_21_22/amp_72_overlap.bed"
+  amplicon73:
+    bedfile: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/raw_read_extraction/workflow/resources/SarsCov2_21_22/amp_73_overlap.bed"
+  amplicon74:
+    bedfile: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/raw_read_extraction/workflow/resources/SarsCov2_21_22/amp_74_overlap.bed"
+  amplicon75:
+    bedfile: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/raw_read_extraction/workflow/resources/SarsCov2_21_22/amp_75_overlap.bed"
+  amplicon76:
+    bedfile: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/raw_read_extraction/workflow/resources/SarsCov2_21_22/amp_76_overlap.bed"
+  amplicon77:
+    bedfile: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/raw_read_extraction/workflow/resources/SarsCov2_21_22/amp_77_overlap.bed"
+  amplicon78:
+    bedfile: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/raw_read_extraction/workflow/resources/SarsCov2_21_22/amp_78_overlap.bed"
+  amplicon79:
+    bedfile: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/raw_read_extraction/workflow/resources/SarsCov2_21_22/amp_79_overlap.bed"
+  amplicon80:
+    bedfile: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/raw_read_extraction/workflow/resources/SarsCov2_21_22/amp_80_overlap.bed"
+  amplicon81:
+    bedfile: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/raw_read_extraction/workflow/resources/SarsCov2_21_22/amp_81_overlap.bed"
+  amplicon82:
+    bedfile: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/raw_read_extraction/workflow/resources/SarsCov2_21_22/amp_82_overlap.bed"
+  amplicon83:
+    bedfile: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/raw_read_extraction/workflow/resources/SarsCov2_21_22/amp_83_overlap.bed"
+
+
+#Luzern and Altenrhein are not included in the analysis as they had very low coverage and no mutations detected.
+
+locations:
+  zurich:
+    location_name: "Zürich (ZH)"
+    location_code: '10'
+  lugano:
+    location_name: "Lugano (TI)"
+    location_code: '05'
+  geneve:
+    location_name: "Genève (GE)"
+    location_code: '16'
+  chur:
+    location_name: "Chur (GR)"
+    location_code: '17'
+  laupen:
+    location_name: "Laupen (BE)"
+    location_code: '25'
+  altenrhein:
+    location_name: "Altenrhein (SG)"
+    location_code: '19'
