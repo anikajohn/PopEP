@@ -20,6 +20,11 @@
 # Python cache
 **/__pycache__/
 
+# BAM files and R environment library dirs are never tracked
+**/*.bam
+**/*.bam.bai
+**/renv/
+
 # Generated file indexes
 **/*.fai
 
