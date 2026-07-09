@@ -9,6 +9,8 @@
 **/.RData
 **/.Rhistory
 **/.Rapp.history
+**/.Renviron
+**/.Rprofile
 
 # Execution and Log files
 **/*.err
@@ -53,3 +55,12 @@ test_merge.ipynb
 **/subclonal_muation_distribution/
 **/test_data/
 **/*_results/
+**/SarsCov2_gisaid_CH_21_22/
+
+# Only THD_calculations/workflow_rawReads is the tracked pipeline; the rest
+# of THD_calculations/ (loose scripts, sibling legacy "workflow" pipeline,
+# stray alignment file) is not
+THD_calculations/*.R
+THD_calculations/*.r
+THD_calculations/*.aln
+THD_calculations/workflow/
