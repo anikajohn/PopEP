@@ -64,3 +64,15 @@ THD_calculations/*.R
 THD_calculations/*.r
 THD_calculations/*.aln
 THD_calculations/workflow/
+
+# One-off data/log outputs, not pipeline inputs
+THD_calculations/workflow_rawReads/pairsnp_haplo_dist.tsv
+THD_calculations/workflow_rawReads/test_THD_plot.png
+THD_calculations/workflow_rawReads/test_index_file_processed.tsv
+raw_read_extraction/workflow/output.png
+raw_read_extraction/workflow/summary.txt
+/timeline.tsv
+old/timeline.tsv
+analysis_scripts/basecnt.tsv.gz
+analysis_scripts/position_662_combined.csv
+analysis_scripts/position_662_heatmap.png
