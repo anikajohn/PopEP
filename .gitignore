@@ -25,6 +25,9 @@
 **/*.bam.bai
 **/renv/
 
+# Large sample metadata table, treated as data not code
+raw_read_extraction/workflow/scripts/AmpCov/samples.tsv
+
 # Generated file indexes
 **/*.fai
 
