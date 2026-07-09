@@ -1,0 +1,55 @@
+# --- General Files to Ignore ---
+
+# macOS system files
+**/.DS_Store
+**/*._*
+
+# R Project files
+**/.Rproj.user
+**/.RData
+**/.Rhistory
+**/.Rapp.history
+
+# Execution and Log files
+**/*.err
+**/*.out
+**/*.log
+
+# Python cache
+**/__pycache__/
+
+# Generated file indexes
+**/*.fai
+
+# Snakemake dry-run output
+**/dryrun*.txt
+
+# Editor workspace files (personal)
+**/*.code-workspace
+
+# Specific Notebooks
+test_merge.ipynb
+
+
+# --- Directories to Ignore ---
+
+# Snakemake internal files
+**/.snakemake/
+
+# Pattern-matched result folders
+**/results*/
+
+# Log directories
+**/test_logs/
+**/logs/
+**/scripts/clinical_data/
+
+# Large data / pipeline output dirs
+**/nextclade/
+**/augur/
+**/augur_nextclade/
+**/Augur_Bootstraps/
+**/THD_calculations_local/
+**/subclonal_muation_distribution/
+**/test_data/
+**/*_results/
