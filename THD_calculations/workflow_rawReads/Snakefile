@@ -18,6 +18,7 @@ input_dir = config['input_dir']
 output_dir = config['output_dir']
 
 
+
 wildcard_constraints:
     sample="[^/]+/[^/]+",      # Matches 'sample/batch'
     location="[^/]+",          # Prevents location from grabbing extra slashes
@@ -27,7 +28,7 @@ wildcard_constraints:
 
 rule all:
     input:
-        expand(f"{output_dir}/{{location}}/{{amplicon}}/nextclade_results", location=LOCATIONS, amplicon=AMPLICONS),
+        # expand(f"{output_dir}/{{location}}/{{amplicon}}/nextclade_results", location=LOCATIONS, amplicon=AMPLICONS),
         # thd_analysis outputs
         expand(f"{output_dir}/{{location}}/{{amplicon}}/THD_calculation/index_time_parameters.tsv", location=LOCATIONS, amplicon=AMPLICONS),
         # coverage_analysis outputs
@@ -78,6 +79,9 @@ rule make_meta_ww:
         metadata=f"{output_dir}/{{location}}/{{amplicon}}/metadata.tsv"
     log:
         f"logs/{{location}}/{{amplicon}}/make_meta_ww.log"
+    resources:
+        mem_mb_per_cpu=4000
+    threads: 1
     shell:
         """
         conda run -n nextclade python scripts/fasta_to_metadata.py \
@@ -90,39 +94,46 @@ rule nextclade_classify_ww:
     input:
         ww_haplo_fasta=f"{input_dir}/{{location}}/{{amplicon}}/combined_amp_reads_versions.fasta"
     output:
-        nextclade_output=directory(f"{output_dir}/{{location}}/{{amplicon}}/nextclade_results")
+        nextclade_aln=f"{output_dir}/{{location}}/{{amplicon}}/nextclade_results/nextclade.aligned.fasta",
+        nextclade_tsv=f"{output_dir}/{{location}}/{{amplicon}}/nextclade_results/nextclade.tsv"
     params:
         reference=config['reference'],
-        reference_dataset=config['reference_dataset']
+        reference_dataset=config['reference_dataset'],
+        nextclade_output=directory(f"{output_dir}/{{location}}/{{amplicon}}/nextclade_results")
     log:
         f"logs/{{location}}/{{amplicon}}/nextclade_classify_ww.log"
     resources:
         mem_mb_per_cpu=16000
+    threads: 1
     shell:
         """
         conda run -n nextclade nextclade3 run \
             --input-dataset {params.reference_dataset} \
             --input-ref {params.reference} \
             --masked-muts-weight 0 \
-            --output-all {output.nextclade_output} \
+            --output-fasta {output.nextclade_aln} \
+            --output-tsv {output.nextclade_tsv} \
+            --output-all {params.nextclade_output} \
             {input.ww_haplo_fasta} &> {log}
         """
 
 rule merge_nextclade_meta_ww:
     """Merge Nextclade results with metadata for wastewater samples"""
     input:
-        metadata=f"{output_dir}/{{location}}/{{amplicon}}/metadata.tsv"
+        metadata=f"{output_dir}/{{location}}/{{amplicon}}/metadata.tsv",
+        nextclade=f"{output_dir}/{{location}}/{{amplicon}}/nextclade_results/nextclade.tsv"
     output:
         merged=f"{output_dir}/{{location}}/{{amplicon}}/nextclade_metadata.tsv"
-    params:
-        nextclade=f"{output_dir}/{{location}}/{{amplicon}}/nextclade_results/nextclade.tsv"
     log:
         f"logs/{{location}}/{{amplicon}}/merge_nextclade_meta_ww.log"
+    resources:
+        mem_mb_per_cpu=4000
+    threads: 1
     shell:
         """
         conda run -n nextclade python scripts/add_metaInfo.py \
             -m {input.metadata} \
-            -n {params.nextclade} \
+            -n {input.nextclade} \
             -l {wildcards.location} \
             -a {wildcards.amplicon} \
             -o {output.merged} &> {log}
@@ -136,6 +147,9 @@ rule coverage_info_ww:
         coverage_info=f"{output_dir}/{{location}}/{{amplicon}}/combined_amp_cov_location_amplicon.tsv"
     log:
         f"logs/{{location}}/{{amplicon}}/coverage_info_ww.log"
+    resources:
+        mem_mb_per_cpu=4000
+    threads: 1
     shell:
         """
         conda run -n nextclade python scripts/coverage_info_ww.py \
@@ -150,36 +164,40 @@ rule coverage_info_ww:
 rule distance_mat:
     """Calculate pairwise SNP distance matrix for wastewater samples"""
     input:
-        fasta_file=f"{input_dir}/{{location}}/{{amplicon}}/combined_amp_reads_versions.fasta"
+        fasta_file=f"{output_dir}/{{location}}/{{amplicon}}/nextclade_results/nextclade.aligned.fasta"
     output:
-        dist_mat=f"{output_dir}/{{location}}/{{amplicon}}/dist_mat.csv"
+        dist_mat=f"{output_dir}/{{location}}/{{amplicon}}/dist_mat.tsv.gz"
     log:
         f"logs/{{location}}/{{amplicon}}/distance_mat.log"
+    threads: 16
     resources:
-        mem_mb_per_cpu=16000,
-        runtime=180
+        mem_mb_per_cpu=8000,
+        runtime=720
     shell:
         """
-        conda run -n THD_analysis pairsnp -c {input.fasta_file} > {output.dist_mat} 2> {log}
+        conda run -n THD_analysis pairsnp -t {threads} {input.fasta_file} 2> {log} | gzip -1 > {output.dist_mat}
         """
 
 
 rule calculate_thd_single:
     """Calculate THD for one timescale/timewindow combination"""
     input:
-        seq_file=f"{input_dir}/{{location}}/{{amplicon}}/combined_amp_reads_versions.fasta",
+        seq_file=f"{output_dir}/{{location}}/{{amplicon}}/nextclade_results/nextclade.aligned.fasta",
         meta_file=f"{output_dir}/{{location}}/{{amplicon}}/metadata.tsv",
-        dist_mat=f"{output_dir}/{{location}}/{{amplicon}}/dist_mat.csv"
+        dist_mat=f"{output_dir}/{{location}}/{{amplicon}}/dist_mat.tsv.gz"
     output:
         output_file=temp(f"{output_dir}/{{location}}/{{amplicon}}/THD_calculation/thd_{{timescale}}_{{timewindow}}.tsv")
     params:
         mutation_rate=config["mutation_rate"],
         nextclade_file=f"{output_dir}/{{location}}/{{amplicon}}/nextclade_results/nextclade.tsv",
-        count_file=f"{input_dir}/{{location}}/{{amplicon}}/combined_amp_read_versions_counts.tsv"
+        count_file=f"{input_dir}/{{location}}/{{amplicon}}/combined_amp_read_versions_counts.tsv",
+        subclade_col=config["nextclade_subclade_col"],
+        clade_col=config["nextclade_clade_col"]
     log:
         f"logs/{{location}}/{{amplicon}}/calculate_thd_{{timescale}}_{{timewindow}}.log"
     resources:
-        mem_mb_per_cpu=50000
+        mem_mb_per_cpu=80000
+    threads: 1
     shell:
         """
         conda run -n THD_analysis Rscript scripts/THD_haplo_analysis.R \
@@ -192,6 +210,8 @@ rule calculate_thd_single:
             -s {wildcards.timescale} \
             -w {wildcards.timewindow} \
             -f {output.output_file} \
+            -b {params.subclade_col} \
+            -l {params.clade_col} \
             &> {log}
         """
 
@@ -206,6 +226,9 @@ rule gather_thd:
         )
     output:
         f"{output_dir}/{{location}}/{{amplicon}}/THD_calculation/index_time_parameters.tsv"
+    threads: 1
+    resources:
+        mem_mb_per_cpu=20000
     shell:
         """
         head -1 {input[0]} > {output}
@@ -223,9 +246,14 @@ rule abundance_analysis:
         output_plot_byDay=f"{output_dir}/{{location}}/{{amplicon}}/subclade_abundance/plot_subclade_frequency_byDay.png",
         output_plot_byWeek=f"{output_dir}/{{location}}/{{amplicon}}/subclade_abundance/plot_subclade_frequency_byWeek.png"
     params:
-        colour_palette=config["colour_palette"]
+        colour_palette=config["colour_palette"],
+        subclade_col=config["nextclade_subclade_col"],
+        clade_col=config["nextclade_clade_col"]
     log:
         f"logs/{{location}}/{{amplicon}}/abundance_analysis.log"
+    threads: 1
+    resources:
+        mem_mb_per_cpu=20000
     shell:
         """
         conda run -n THD_analysis Rscript scripts/abundance_analysis.R \
@@ -235,6 +263,8 @@ rule abundance_analysis:
             -d {output.output_plot_byDay} \
             -w {output.output_plot_byWeek} \
             -c {params.colour_palette} \
+            -b {params.subclade_col} \
+            -l {params.clade_col} \
             &> {log}
         """
 
@@ -251,6 +281,9 @@ rule index_visualisation:
         colour_palette=config["colour_palette"]
     log:
         f"logs/{{location}}/{{amplicon}}/index_visualisation.log"
+    threads: 1
+    resources:
+        mem_mb_per_cpu=20000
     shell:
         """
         conda run -n THD_analysis Rscript scripts/index_visualisation.R \
@@ -273,6 +306,9 @@ rule coverage_analysis:
         output_plot_nreads=f"{output_dir}/{{location}}/{{amplicon}}/amplicon_coverage/plot_numreads.png"
     log:
         f"logs/{{location}}/{{amplicon}}/coverage_analysis.log"
+    threads: 1
+    resources:
+        mem_mb_per_cpu=20000
     shell:
         """
         conda run -n THD_analysis Rscript scripts/coverage_analysis.R \
@@ -287,7 +323,7 @@ rule coverage_analysis:
 rule combine_across_locations:
     """Combine files across all locations for a given amplicon"""
     input:
-        fasta_files=expand(f"{input_dir}/{{location}}/{{{{amplicon}}}}/combined_amp_reads_versions.fasta", location=LOCATIONS),
+        fasta_files=expand(f"{output_dir}/{{location}}/{{{{amplicon}}}}/nextclade_results/nextclade.aligned.fasta", location=LOCATIONS),
         metadata_files=expand(f"{output_dir}/{{location}}/{{{{amplicon}}}}/metadata.tsv", location=LOCATIONS),
         nextclade_meta_files=expand(f"{output_dir}/{{location}}/{{{{amplicon}}}}/nextclade_metadata.tsv", location=LOCATIONS),
         coverage_files=expand(f"{output_dir}/{{location}}/{{{{amplicon}}}}/combined_amp_cov_location_amplicon.tsv", location=LOCATIONS),
@@ -300,6 +336,9 @@ rule combine_across_locations:
         combined_counts=f"{output_dir}/over_all_locations/{{amplicon}}/combined_amp_read_versions_counts.tsv"
     log:
         f"logs/over_all_locations/{{amplicon}}/combine_across_locations.log"
+    threads: 1
+    resources:
+        mem_mb_per_cpu=20000
     shell:
         """
         conda run -n nextclade python scripts/combine_across_locations.py \
@@ -316,21 +355,22 @@ rule combine_across_locations:
             &> {log}
         """
 
-
+#TODO 
 rule distance_mat_combined_location:
     """Calculate pairwise SNP distance matrix for combined wastewater samples across all locations"""
     input:
         fasta_file=f"{output_dir}/over_all_locations/{{amplicon}}/combined_amp_reads_versions.fasta"
     output:
-        dist_mat=f"{output_dir}/over_all_locations/{{amplicon}}/dist_mat.csv"
+        dist_mat=f"{output_dir}/over_all_locations/{{amplicon}}/dist_mat.tsv.gz"
     log:
         f"logs/over_all_locations/{{amplicon}}/distance_mat.log"
+    threads: 2
     resources:
-        mem_mb_per_cpu=32000,
-        runtime=360
+        mem_mb_per_cpu=1000000,
+        runtime=2880
     shell:
         """
-        conda run -n THD_analysis pairsnp -c {input.fasta_file} > {output.dist_mat} 2> {log}
+        conda run -n THD_analysis pairsnp -t {threads} {input.fasta_file} 2> {log} | gzip -1 > {output.dist_mat}
         """
 
 
@@ -340,17 +380,21 @@ rule calculate_thd_combined_location_single:
         seq_file=f"{output_dir}/over_all_locations/{{amplicon}}/combined_amp_reads_versions.fasta",
         meta_file=f"{output_dir}/over_all_locations/{{amplicon}}/combined_metadata.tsv",
         nextclade_file=f"{output_dir}/over_all_locations/{{amplicon}}/combined_nextclade_metadata.tsv",
-        dist_mat=f"{output_dir}/over_all_locations/{{amplicon}}/dist_mat.csv"
+        dist_mat=f"{output_dir}/over_all_locations/{{amplicon}}/dist_mat.tsv.gz"
     output:
         output_file=temp(f"{output_dir}/over_all_locations/{{amplicon}}/THD_calculation/thd_{{timescale}}_{{timewindow}}.tsv")
     params:
         mutation_rate=config["mutation_rate"],
         colour_palette=config["colour_palette"],
-        count_file=f"{output_dir}/over_all_locations/{{amplicon}}/combined_amp_read_versions_counts.tsv"
+        count_file=f"{output_dir}/over_all_locations/{{amplicon}}/combined_amp_read_versions_counts.tsv",
+        subclade_col=config["nextclade_subclade_col"],
+        clade_col=config["nextclade_clade_col"]
     log:
         f"logs/over_all_locations/{{amplicon}}/calculate_thd_{{timescale}}_{{timewindow}}.log"
+    threads: 1
     resources:
-        mem_mb_per_cpu=100000
+        mem_mb_per_cpu=100000,
+        runtime=2880
     shell:
         """
         conda run -n THD_analysis Rscript scripts/THD_haplo_analysis.R \
@@ -363,6 +407,8 @@ rule calculate_thd_combined_location_single:
             -s {wildcards.timescale} \
             -w {wildcards.timewindow} \
             -f {output.output_file} \
+            -b {params.subclade_col} \
+            -l {params.clade_col} \
             &> {log}
         """
 
@@ -377,6 +423,9 @@ rule gather_thd_combined_location:
         )
     output:
         f"{output_dir}/over_all_locations/{{amplicon}}/THD_calculation/combined_index_time_parameters.tsv"
+    threads: 1
+    resources:
+        mem_mb_per_cpu=20000
     shell:
         """
         head -1 {input[0]} > {output}
@@ -394,9 +443,14 @@ rule abundance_analysis_combined_location:
         output_plot_byDay=f"{output_dir}/over_all_locations/{{amplicon}}/subclade_abundance/combined_plot_subclade_frequency_byDay.png",
         output_plot_byWeek=f"{output_dir}/over_all_locations/{{amplicon}}/subclade_abundance/combined_plot_subclade_frequency_byWeek.png"
     params:
-        colour_palette=config["colour_palette"]
+        colour_palette=config["colour_palette"],
+        subclade_col=config["nextclade_subclade_col"],
+        clade_col=config["nextclade_clade_col"]
     log:
         f"logs/over_all_locations/{{amplicon}}/abundance_analysis.log"
+    threads: 1
+    resources:
+        mem_mb_per_cpu=20000
     shell:
         """
         conda run -n THD_analysis Rscript scripts/abundance_analysis.R \
@@ -407,6 +461,8 @@ rule abundance_analysis_combined_location:
             -w {output.output_plot_byWeek} \
             -a \
             -c {params.colour_palette} \
+            -b {params.subclade_col} \
+            -l {params.clade_col} \
             &> {log}
         """
 
@@ -423,6 +479,9 @@ rule index_visualisation_combined_location:
         colour_palette=config["colour_palette"]
     log:
         f"logs/over_all_locations/{{amplicon}}/index_visualisation.log"
+    threads: 1
+    resources:
+        mem_mb_per_cpu=20000
     shell:
         """
         conda run -n THD_analysis Rscript scripts/index_visualisation.R \
@@ -446,6 +505,9 @@ rule coverage_analysis_combined_location:
         output_plot_nreads=f"{output_dir}/over_all_locations/{{amplicon}}/amplicon_coverage/combined_plot_numreads.png"
     log:
         f"logs/over_all_locations/{{amplicon}}/coverage_analysis.log"
+    threads: 1
+    resources:
+        mem_mb_per_cpu=20000
     shell:
         """
         conda run -n THD_analysis Rscript scripts/coverage_analysis.R \

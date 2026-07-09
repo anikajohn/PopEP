@@ -1,7 +1,7 @@
 executor: slurm
 default-resources:
   slurm_account: "'es_beere'"
-  mem_mb: 4000
+  runtime: 14400
 restart-times: 3
 max-jobs-per-second: 20
 max-status-checks-per-second: 20

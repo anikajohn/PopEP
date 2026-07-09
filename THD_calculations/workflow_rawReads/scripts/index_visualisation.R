@@ -74,25 +74,32 @@ if (nrow(df_count) == 0L){
 
   
   ##### PLOTTING ######
-  
+
+  get_colors <- function(n) {
+    # polychrome is capped at 36; interpolate beyond that
+    if (n <= 36) {
+      as.vector(pals::polychrome(max(2L, n)))[seq_len(n)]
+    } else {
+      colorRampPalette(as.vector(pals::polychrome(36)))(n)
+    }
+  }
+
   if (is.na(palette_file)){
     all_subclades <- unique(dt$subclade)
-    random_colors <- as.vector(pals::polychrome(length(all_subclades)))
-    custom_palette <- setNames(random_colors, all_subclades)
-    
+    custom_palette <- setNames(get_colors(length(all_subclades)), all_subclades)
+
   }else{
-    
+
     config <- read_yaml(palette_file)
     defined_palette <- unlist(config)
     all_subclades <- unique( dt$subclade)
     missing_subclades <- setdiff(all_subclades, names(defined_palette))
-    
+
     if (length(missing_subclades) > 0) {
-      random_colors <- as.vector(pals::polychrome(length(missing_subclades)))
-      random_palette <- setNames(random_colors, missing_subclades)
+      random_palette <- setNames(get_colors(length(missing_subclades)), missing_subclades)
       custom_palette<- c(defined_palette, random_palette)
-      
-      message("Warning: Assigned random colors to missing subclades: ", 
+
+      message("Warning: Assigned random colors to missing subclades: ",
               paste(missing_subclades, collapse = ", "))
     } else {
       custom_palette <- defined_palette
@@ -106,7 +113,7 @@ if (nrow(df_count) == 0L){
   p <- ggplot(dt, aes(x = date, y = indicies, colour = subclade)) +
     geom_point(alpha = 0.4) +
     geom_smooth(aes(x = date, y = indicies, colour = subclade, weight = count),
-                method = "gam", se = FALSE) +
+                method = "gam", se = TRUE) +
     scale_colour_manual(values = custom_palette) +
     facet_grid(cols = vars(time_window),
                 rows = vars(timescale),

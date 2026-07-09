@@ -14,7 +14,7 @@ def extract_date_from_header(header):
     Returns date in YYYY-MM-DD format.
     """
     # Pattern to match YYYY_MM_DD in the header
-    match = re.search(r'(\d{4})_(\d{2})_(\d{2})', header)
+    match = re.search(r'(\d{4})[_-](\d{2})[_-](\d{2})', header)
     if match:
         year, month, day = match.groups()
         return f"{year}-{month}-{day}"

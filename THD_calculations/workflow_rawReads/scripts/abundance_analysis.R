@@ -22,7 +22,11 @@ option_list = list(
   make_option(c("-k", "--count_file"), action="store", default=NA, type='character',
               help="Path to combined_amp_read_versions_counts.tsv file"),
   make_option(c("-c", "--colour_palette"), action="store", default=NA, type='character',
-              help="path to json file with colour palette")
+              help="path to json file with colour palette"),
+  make_option(c("-b", "--subclade_col"), action="store", default="subclade", type='character',
+              help="Column name for subclade in nextclade TSV (e.g. 'subclade' or 'partiallyAliased')"),
+  make_option(c("-l", "--clade_col"), action="store", default="legacy-clade", type='character',
+              help="Column name for legacy/WHO clade in nextclade TSV (e.g. 'legacy-clade' or 'clade_who')")
 )
 
 
@@ -72,8 +76,13 @@ if (nrow(df_count) == 0L){
   
 }else{
 
-  dt = fread(nextclade_meta_file, 
-             select = c("strain","legacy-clade","subclade", "date", "amplicon", "location")) %>% 
+  dt = fread(nextclade_meta_file,
+             select = c("strain", opt$clade_col, opt$subclade_col, "date", "amplicon", "location"))
+  if (opt$subclade_col != "subclade")
+    setnames(dt, opt$subclade_col, "subclade")
+  if (opt$clade_col != "legacy-clade")
+    setnames(dt, opt$clade_col, "legacy-clade")
+  dt = dt %>%
     mutate(`legacy-clade` = as.character(`legacy-clade`),
            week_date = floor_date(as.Date(date), unit = "week"),
            month_date = floor_date(as.Date(date), unit = "month"))
@@ -85,21 +94,25 @@ if (nrow(df_count) == 0L){
   
   ##### PLOTTING ######
   
+  make_colors <- function(n) {
+    if (n == 0L) return(character(0))
+    if (n <= 36L) as.vector(pals::polychrome(max(n, 2L)))[seq_len(n)]
+    else colorRampPalette(as.vector(pals::polychrome(36L)))(n)
+  }
+
   if (is.na(palette_file)){
     all_subclades <- unique(dt$subclade)
-    random_colors <- as.vector(pals::polychrome(length(all_subclades)))
-    custom_palette <- setNames(random_colors, all_subclades)
-    
+    custom_palette <- setNames(make_colors(length(all_subclades)), all_subclades)
+
   }else{
-    
+
     config <- read_yaml(palette_file)
     defined_palette <- unlist(config)
-    all_subclades <- unique( dt$subclade)
+    all_subclades <- unique(dt$subclade)
     missing_subclades <- setdiff(all_subclades, names(defined_palette))
-    
+
     if (length(missing_subclades) > 0) {
-      random_colors <- as.vector(pals::polychrome(length(missing_subclades)))
-      random_palette <- setNames(random_colors, missing_subclades)
+      random_palette <- setNames(make_colors(length(missing_subclades)), missing_subclades)
       custom_palette<- c(defined_palette, random_palette)
       
       message("Warning: Assigned random colors to missing subclades: ", 

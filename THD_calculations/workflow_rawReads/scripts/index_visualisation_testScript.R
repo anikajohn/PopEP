@@ -6,11 +6,13 @@ library(pals)
 source("/Users/anjohn/Desktop/euler/Influenza_VaccinePred/THD_calculations/workflow_rawReads/scripts/THD_functions.R")
 
 ######INPUT########
-result_dir = "/Users/anjohn/Desktop/euler/Influenza_VaccinePred/THD_calculations/workflow_rawReads/test_haplotypes/results_haplo_H1_24_25/"
+result_dir = "/Users/anjohn/Desktop/euler/Influenza_VaccinePred/THD_calculations/workflow_rawReads/results_haplo_H1_24_25"
+# input_dir = "/Users/anjohn/Desktop/euler/Influenza_VaccinePred/raw_read_extraction/workflow/results_haplo_H1_24_25"
+input_dir = result_dir
 
 #will be handled by wildcards
-amp = "amplicon4/updated_ref_dataset"
-location = "geneve" #one run also overall 
+amp = "amplicon5"
+location = "over_all_locations" #one run also overall 
 
 palette_file = "/Users/anjohn/Desktop/euler/Influenza_VaccinePred/THD_calculations/workflow_rawReads/resources/colour_palette/H1/colours.json"
 
@@ -21,10 +23,10 @@ index_file= paste(result_dir,
                       location,
                       amp,
                       "THD_calculation",
-                      "index_time_parameters.tsv",
+                      "combined_index_time_parameters.tsv",
                       sep = "/")
 
-count_file = paste(result_dir,
+count_file = paste(input_dir,
                    location,
                    amp,
                    "combined_amp_read_versions_counts.tsv",
@@ -83,8 +85,8 @@ if (nrow(df_count) == 0L){
 
     p <- ggplot(dt, aes(x = date, y = indicies, colour = subclade)) +
       geom_point(alpha = 0.4) +
-      geom_smooth(aes(x = date, y = indicies, colour = subclade, weight = count),
-                  method = "gam", se = FALSE) +
+      geom_smooth(aes(x = date, y = indicies, colour = subclade, weight = count), 
+                  se = TRUE, method = "gam", level = 0.999) +
       scale_colour_manual(values = custom_palette) +
       facet_grid(cols = vars(time_window),
                  rows = vars(timescale),
@@ -92,7 +94,8 @@ if (nrow(df_count) == 0L){
       theme(text = element_text(size = 20),
             axis.text.x = element_text(angle = 45, hjust = 1))
 
-  
+  p
+    
   ##### OUTPUTTING ######
   
   
