@@ -16,6 +16,12 @@ input_dir: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_Vacc
 output_dir: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/THD_calculations/workflow_rawReads/results_debug_haplo_H1_24_25"
 reference_dataset: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/THD_calculations/workflow_rawReads/resources/datasets/H1_26update/CY121680"
 
+# Column names in the nextclade TSV for subclade and legacy clade.
+# nextclade2: subclade_col: "subclade",  clade_col: "legacy-clade"
+# nextclade3: subclade_col: "partiallyAliased",  clade_col: "clade_who"
+nextclade_subclade_col: "subclade"
+nextclade_clade_col: "legacy-clade"
+
 # ============================================================
 # LolliJac configuration settings for H1 24/25 season 
 # ============================================================
@@ -23,6 +29,7 @@ reference_dataset: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influe
 
 reference: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/raw_read_extraction/workflow/resources/H1/CY121680/H1.fasta"
 reference_name: "CY121680.1"
+<<<<<<< Updated upstream
 reference_index: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/raw_read_extraction/workflow/resources/H1/CY121680/H1.fasta.fai"
 # path_to_data: "/cluster/project/pangolin/old_setup/not_necessary/influenza_pipeline/IA_H1/working/results"
 # results_dir: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/Lollijac/results_H1_24_25_new" #Lollijac output
@@ -35,6 +42,10 @@ reference_index: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenz
 # threshold_value: 0.005
 # rare_mutation_limit_days: 2
 # coverage_threshold: 10 
+=======
+reference_index: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/Lollijac/resources/H1.fasta.fai"
+
+>>>>>>> Stashed changes
 
 # Amplicon-specific BED files
 amplicons:
