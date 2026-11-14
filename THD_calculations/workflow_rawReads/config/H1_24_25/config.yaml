@@ -22,9 +22,9 @@ percentage_subsample: 0.01
 # ============================================================
  
 
-reference: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/Lollijac/resources/H1.fasta"
+reference: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/raw_read_extraction/workflow/resources/H1/CY121680/H1.fasta"
 reference_name: "CY121680.1"
-reference_index: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/Lollijac/resources/H1.fasta.fai"
+reference_index: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/raw_read_extraction/workflow/resources/H1/CY121680/H1.fasta.fai"
 path_to_data: "/cluster/project/pangolin/old_setup/not_necessary/influenza_pipeline/IA_H1/working/results"
 results_dir: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/Lollijac/results_H1_24_25_new" #Lollijac output
 # results_dir: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/augur/Bootstrap_experiment/workflow/lollijac_results_H1_24_25" #test
@@ -42,15 +42,15 @@ amplicons:
 #   amplicon1:
 #     bedfile: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/Lollijac/resources/H1.amp1.insert.bed"
   amplicon2:
-    bedfile: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/Lollijac/resources/H1.amp2.insert.bed"
+    bedfile: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/raw_read_extraction/workflow/resources/H1/H1.amp2.insert.empirical.bed"
   amplicon3:
-    bedfile: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/Lollijac/resources/H1.amp3.insert.bed"
+    bedfile: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/raw_read_extraction/workflow/resources/H1/H1.amp3.insert.bed"
   amplicon4:
-    bedfile: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/Lollijac/resources/H1.amp4.insert.bed"
+    bedfile: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/raw_read_extraction/workflow/resources/H1/H1.amp4.insert.bed"
   amplicon5:
-    bedfile: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/Lollijac/resources/H1.amp5.insert.bed"
+    bedfile: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/raw_read_extraction/workflow/resources/H1/H1.amp5.insert.bed"
   amplicon6:
-    bedfile: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/Lollijac/resources/H1.amp6.insert.bed"
+    bedfile: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/raw_read_extraction/workflow/resources/H1/H1.amp6.insert.bed"
 
 #Luzern and Altenrhein are not included in the analysis as they had very low coverage and no mutations detected.
 
