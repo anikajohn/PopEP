@@ -13,7 +13,7 @@
 # Set variables
 output_dir="/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/THD_calculations/workflow_rawReads/scripts/clinical_data/H1Gisaid_2425_2526/nextclade/"
 reference_dataset="/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/THD_calculations/workflow_rawReads/resources/datasets/H1_26update/CY121680"
-reference="/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/Lollijac/resources/H1.fasta"
+reference="/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/raw_read_extraction/workflow/resources/H1/CY121680/H1.fasta"
 
 
 nextclade3 run \

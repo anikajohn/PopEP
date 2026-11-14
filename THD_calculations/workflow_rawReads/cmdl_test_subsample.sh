@@ -16,7 +16,7 @@ location="over_all_locations"
 amplicon="amplicon4"
 dummy_dir="2000n_downsampled"
 reference_dataset="/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/THD_calculations/workflow_rawReads/resources/datasets/H1_26update/CY121680"
-reference="/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/Lollijac/resources/H1.fasta"
+reference="/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/raw_read_extraction/workflow/resources/H1/CY121680/H1.fasta"
 colour_palette="/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/THD_calculations/workflow_rawReads/resources/colour_palette/H1/colours.json"
 
 mkdir -p ${output_dir}/${location}/${amplicon}/${dummy_dir}/THD_calculation
