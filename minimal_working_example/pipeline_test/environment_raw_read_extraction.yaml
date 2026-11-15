@@ -1,0 +1,14 @@
+# Software for PopEP raw_read_extraction (replaces the implicit "lollijac" env)
+name: popep_raw
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python=3.11
+  - snakemake-minimal
+  - samtools
+  - smallgenomeutilities>=0.5.2   # paired_end_read_merger (added in 0.5), aln2basecnt
+  - pysam
+  - pandas
+  - biopython
+  - pyyaml

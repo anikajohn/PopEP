@@ -1,0 +1,82 @@
+# Simulation scenario: C.1.9.3 -> D.3.1 transition in Zürich and Lugano wastewater.
+# All paths are relative to the minimal_example/ folder.
+
+seed: 42
+
+reference: resources/reference/H1.fasta     # CY121680.1, same reference as the PopEP H1 configs
+
+# Amplicon insert BEDs (copied from PopEP raw_read_extraction/workflow/resources/H1)
+amplicons:
+  amplicon2: resources/amplicons/H1.amp2.insert.empirical.bed
+  amplicon3: resources/amplicons/H1.amp3.insert.bed
+  amplicon4: resources/amplicons/H1.amp4.insert.bed
+  amplicon5: resources/amplicons/H1.amp5.insert.bed
+  amplicon6: resources/amplicons/H1.amp6.insert.bed
+
+# Sequencing (art_illumina amplicon mode, paired-end)
+sequencing:
+  read_length: 250
+  art_profile: MSv3            # built-in MiSeq v3 profile (max 250 bp)
+  fragment_padding: 5          # bp added on each side of the insert so reads fully span it
+  read_pairs_per_amplicon: 200 # per sample and amplicon
+  no_indel_errors: true        # keeps read<->reference offsets exact (needed for low-quality edge case)
+  min_base_quality: 25         # art -qL. Default MSv3 qualities put ~5-15% of bases at Q<=20, which PopEP
+                               # turns into random Ns everywhere. 25 keeps Ns to the controlled edge case
+                               # below; set to 0 for realistic MiSeq qualities.
+
+# Sampling
+sampling:
+  start: 2024-11-01
+  end: 2025-04-01
+  every_days: 7
+  sample_prefix: A1            # sample folders: A1_<code>_<YYYY>_<MM>_<DD>/<YYYYMMDD>_SIM/alignments/
+
+locations:
+  zurich:
+    code: "10"
+    name: "Zürich (ZH)"
+    d31_start: 2025-02-01
+  lugano:
+    code: "05"
+    name: "Lugano (TI)"
+    d31_start: 2025-02-14
+
+# Haplotypes ("versions").
+# - source: FASTA projected onto reference coordinates (substitutions only)
+# - parent + mutations: copy of the parent with extra substitutions.
+#   Mutations are 1-based reference positions; "400" = automatic transition, "400T" = explicit base.
+# Dynamics (frequency at time t, renormalised over all versions):
+# - C.1.9.3 versions: constant weight -> they all decline at the same speed as D.3.1 grows
+# - D.3.1 versions: weight 0 before the location's d31_start, then seed_weight * exp(growth_per_day * days)
+haplotypes:
+  C.1.9.3_v1:
+    source: C193_example.fasta
+    weight: 0.5
+  C.1.9.3_v2:
+    parent: C.1.9.3_v1
+    mutations: ["400"]           # amplicon2
+    weight: 0.3
+  C.1.9.3_v3:
+    parent: C.1.9.3_v2
+    mutations: ["1100"]          # amplicon4 + amplicon5
+    weight: 0.2
+  D.3.1_v1:
+    source: D31_example.fasta
+    seed_weight: 0.02
+    growth_per_day: 0.08         # faster than v2
+  D.3.1_v2:
+    parent: D.3.1_v1
+    mutations: ["1540"]          # amplicon6
+    seed_weight: 0.02
+    growth_per_day: 0.05
+
+# Edge case: bases at a variable site get low quality (<= PopEP phred_score_threshold, which is 5 in
+# the current H1 configs), so scan_bam.py marks them as not covered and simulate_reads.py writes "N".
+pipeline_phred_threshold: 5
+low_quality_sites:
+  - position: 400                # C.1.9.3_v1 vs v2 site (amplicon2)
+    quality: 2
+    fraction_of_reads: 0.5
+    locations: [zurich]
+    from: 2024-12-01
+    to: 2025-01-15

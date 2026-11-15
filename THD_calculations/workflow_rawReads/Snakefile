@@ -77,6 +77,8 @@ rule make_meta_ww:
         ww_haplo_fasta=f"{input_dir}/{{location}}/{{amplicon}}/combined_amp_reads_versions.fasta"
     output:
         metadata=f"{output_dir}/{{location}}/{{amplicon}}/metadata.tsv"
+    params:
+        date_flag=lambda wc, config=config: f'-p "{config["date_pattern"]}"' if config.get("date_pattern") else ""
     log:
         f"logs/{{location}}/{{amplicon}}/make_meta_ww.log"
     resources:
@@ -86,7 +88,8 @@ rule make_meta_ww:
         """
         conda run -n nextclade python scripts/fasta_to_metadata.py \
             {input.ww_haplo_fasta} \
-            -o {output.metadata} &> {log}
+            -o {output.metadata} \
+            {params.date_flag} &> {log}
         """
 
 rule nextclade_classify_ww:

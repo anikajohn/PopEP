@@ -284,6 +284,8 @@ rule amplicon_coverage:
         2> {log}
         """
 
+# ------------------------------ Haplotype clustering ------------------------------
+
 rule basecounts:
     input:
         amplicon_bam=f"{output_dir}/{{location}}/{{amplicon}}/{{sample}}/amp_fused_sorted.bam"

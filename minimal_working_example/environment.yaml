@@ -1,0 +1,15 @@
+name: popep_sim
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python=3.12
+  - art=2016.06.05        # art_illumina read simulator
+  - bwa
+  - samtools
+  - biopython
+  - pysam
+  - numpy
+  - pandas
+  - pyyaml
+  - matplotlib

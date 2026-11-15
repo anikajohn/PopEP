@@ -32,6 +32,8 @@ reference_index: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenz
 
 
 amplicons:
+  full_length:
+    bedfile: ""
   amplicon71:
     bedfile: ""
   amplicon72:

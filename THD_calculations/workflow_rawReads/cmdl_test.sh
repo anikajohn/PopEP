@@ -110,15 +110,34 @@ conda activate THD_analysis
 #             -c ${color_palette} \
 
 
-Rscript scripts/THD_haplo_analysis.R \
- -q /cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/raw_read_extraction/workflow/results_haplo_SarsCov2_21_22/chur/amplicon74/combined_amp_reads_versions.fasta \
- -k /cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/raw_read_extraction/workflow/results_haplo_SarsCov2_21_22/chur/amplicon74/combined_amp_read_versions_counts.tsv \
- -d /cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/THD_calculations/workflow_rawReads/results_haplo_SarsCov2_21_22/chur/amplicon74/dist_mat.tsv.gz \
- -m /cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/THD_calculations/workflow_rawReads/results_haplo_SarsCov2_21_22/chur/amplicon74/metadata.tsv \
- -n /cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/THD_calculations/workflow_rawReads/results_haplo_SarsCov2_21_22/chur/amplicon74/nextclade_results/nextclade.tsv \
- -r 0.0008 \
- -s 0.2 \
- -w 0.23 \
- -f /cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/THD_calculations/workflow_rawReads/results_haplo_SarsCov2_21_22/chur/amplicon74/THD_calculation/thd_0.2_0.23.tsv \
- -b partiallyAliased \
- -l clade_who
+# Rscript scripts/THD_haplo_analysis.R \
+#  -q /cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/raw_read_extraction/workflow/results_haplo_SarsCov2_21_22/chur/amplicon74/combined_amp_reads_versions.fasta \
+#  -k /cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/raw_read_extraction/workflow/results_haplo_SarsCov2_21_22/chur/amplicon74/combined_amp_read_versions_counts.tsv \
+#  -d /cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/THD_calculations/workflow_rawReads/results_haplo_SarsCov2_21_22/chur/amplicon74/dist_mat.tsv.gz \
+#  -m /cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/THD_calculations/workflow_rawReads/results_haplo_SarsCov2_21_22/chur/amplicon74/metadata.tsv \
+#  -n /cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/THD_calculations/workflow_rawReads/results_haplo_SarsCov2_21_22/chur/amplicon74/nextclade_results/nextclade.tsv \
+#  -r 0.0008 \
+#  -s 0.2 \
+#  -w 0.23 \
+#  -f /cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/THD_calculations/workflow_rawReads/results_haplo_SarsCov2_21_22/chur/amplicon74/THD_calculation/thd_0.2_0.23.tsv \
+#  -b partiallyAliased \
+#  -l clade_who
+
+
+python scripts/combine_across_locations_test.py \
+            --nextclade results_debug_haplo_H1_24_25/basel/amplicon4/nextclade_results/nextclade.tsv \
+            results_debug_haplo_H1_24_25/chur/amplicon4/nextclade_results/nextclade.tsv \
+            results_debug_haplo_H1_24_25/geneve/amplicon4/nextclade_results/nextclade.tsv \
+            results_debug_haplo_H1_24_25/laupen/amplicon4/nextclade_results/nextclade.tsv \
+            results_debug_haplo_H1_24_25/lugano/amplicon4/nextclade_results/nextclade.tsv \
+            results_debug_haplo_H1_24_25/zurich/amplicon4/nextclade_results/nextclade.tsv  \    
+            --out-nextclade results_debug_haplo_H1_24_25/over_all_locations/amplicon4/test_combined_nextclade.tsv \
+            &> {log}
+
+
+python scripts/add_metaInfo.py \
+            -m results_debug_haplo_H1_24_25/over_all_locations/amplicon4/combined_metadata.tsv \
+            -n results_debug_haplo_H1_24_25/over_all_locations/amplicon4/test_combined_nextclade.tsv \
+            -l "overall_locations" \
+            -a "amplicon4" \
+            -o  results_debug_haplo_H1_24_25/over_all_locations/amplicon4/Test_combined_nextclade_metadata.tsv

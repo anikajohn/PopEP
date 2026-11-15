@@ -96,6 +96,7 @@ if (file.size(seq_file) == 0L){
   
   nextclade = fread(nextclade_file, header = TRUE, sep = "\t",
                     na.strings = c("", "NA", "N/A"))
+  
   if (opt$subclade_col != "subclade" && opt$subclade_col %in% names(nextclade))
     setnames(nextclade, opt$subclade_col, "subclade")
   if (opt$clade_col != "legacy-clade" && opt$clade_col %in% names(nextclade))

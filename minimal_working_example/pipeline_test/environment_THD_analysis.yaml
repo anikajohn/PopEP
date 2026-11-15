@@ -1,0 +1,14 @@
+# THD_calculations calls this env by name: `conda run -n THD_analysis ...`
+name: THD_analysis
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - r-base
+  - r-tidyverse
+  - r-data.table
+  - r-yaml
+  - r-pals
+  - r-optparse
+  - bioconductor-biostrings
+  - pairsnp

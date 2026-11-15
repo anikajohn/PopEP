@@ -1,0 +1,9 @@
+# THD_calculations calls this env by name: `conda run -n nextclade ...`
+name: nextclade
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - nextclade>=3          # provides nextclade3
+  - python=3.11
+  - pandas

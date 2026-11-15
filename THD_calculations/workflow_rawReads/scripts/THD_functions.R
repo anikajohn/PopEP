@@ -213,8 +213,9 @@ genome_length,chunk_size = 500L, mc.cores = 1L){
   pct_lost <- 100 * n_lost / n
 
   if (n_lost > 0) {
-    message(sprintf("%d of %d sample IDs (%.1f%%) not found in metadata$ID.",
+    message(sprintf("%d of %d sample IDs (%.1f%%) not found in metadata$ID:",
                      n_lost, n, pct_lost))
+    message(paste(sample_ids[!matched], collapse = "\n"))
   }
 
   # #50% is a bit abitrary here
@@ -227,6 +228,11 @@ genome_length,chunk_size = 500L, mc.cores = 1L){
   
   
   times <- metadata$time[match(sample_ids, metadata$ID)]
+  
+ 
+  
+  
+  message(paste("not matching IDs:", metadata[is.na(metadata$time), ], collapse = "\n"))
 
   
   if (any(is.na(times))) {

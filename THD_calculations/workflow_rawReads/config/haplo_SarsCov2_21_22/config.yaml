@@ -23,6 +23,13 @@ output_dir: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_Vac
 reference_dataset: "/cluster/work/bewi/members/anjohn/projects/wastewater/Influenza_VaccinePred/THD_calculations/workflow_rawReads/resources/datasets/SarsCov2"
 
 # ============================================================
+# Configurations for Subsampeling
+# ============================================================
+
+subsample_threshold: 500000
+
+
+# ============================================================
 # LolliJac configuration settings for SarsCov2 21/22 season 
 # ============================================================
  
